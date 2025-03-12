@@ -21,7 +21,7 @@ def generate_thumbnail(video_path: str, thumbnail_path: str):
     try:
         (
             ffmpeg
-            .input(video_path, ss=1)  # 1秒目のフレームを取得
+            .input(video_path, ss=300)  # 300秒目のフレームを取得
             .output(thumbnail_path, vframes=1)
             .run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
         )
