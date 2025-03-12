@@ -160,6 +160,6 @@ cython_debug/
 #.idea/
 
 # file
-.mp4
-.jpg
-.png
+*.mp4
+*.jpg
+*.png

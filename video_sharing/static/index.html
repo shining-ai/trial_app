@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動画共有サイト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .upload-form {
+            margin-bottom: 20px;
+        }
+        .video-container {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .video-item {
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 200px;
+            text-align: center;
+        }
+        img {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>動画共有サイト</h1>
+
+    <!-- アップロードフォーム -->
+    <form class="upload-form" id="upload-form">
+        <input type="file" id="file-input" accept="video/*" required>
+        <button type="submit">アップロード</button>
+    </form>
+
+    <!-- 動画一覧 -->
+    <div class="video-container" id="video-list"></div>
+
+    <script>
+        async function fetchVideos() {
+            const response = await fetch("/videos");
+            const videos = await response.json();
+            const container = document.getElementById("video-list");
+            container.innerHTML = "";  // 一旦クリア
+
+            videos.forEach(video => {
+                const videoElement = document.createElement("div");
+                videoElement.classList.add("video-item");
+
+                // サムネイルをキャッシュ回避して表示
+                const thumbnailUrl = video.thumbnail + "?" + new Date().getTime();
+
+                videoElement.innerHTML = `
+                    <a href="${video.url}" target="_blank">
+                        <img src="${thumbnailUrl}" alt="Thumbnail">
+                    </a>
+                    <p>${video.filename}</p>
+                `;
+                container.appendChild(videoElement);
+            });
+        }
+
+        // アップロード処理
+        document.getElementById("upload-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            const fileInput = document.getElementById("file-input");
+            if (!fileInput.files.length) return;
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            const response = await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            if (response.ok) {
+                alert("アップロード成功！");
+                fetchVideos();  // 動画リストを更新
+            } else {
+                alert("アップロード失敗");
+            }
+        });
+
+        // 初回データ取得
+        fetchVideos();
+    </script>
+</body>
+</html>
