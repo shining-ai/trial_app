@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>画像リサイズフォーム</title>
+</head>
+<body>
+    <h1>画像をアップロードしてリサイズ</h1>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="image" required>
+        <button type="submit">リサイズ</button>
+    </form>
+
+    {% if resized_image %}
+        <h2>リサイズ結果：</h2>
+        <img src="data:image/jpeg;base64,{{ resized_image }}" alt="Resized Image">
+    {% endif %}
+</body>
+</html>

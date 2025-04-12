@@ -1,0 +1,12 @@
+services:
+  django:
+    build: .
+    tty: true
+    stdin_open: true
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/app
+      # - ./uploads:/app/uploads
+
+        #    restart: always
