@@ -3,3 +3,5 @@ djangorestframework
 uvicorn
 python-multipart
 ffmpeg-python
+pillow
+requests
