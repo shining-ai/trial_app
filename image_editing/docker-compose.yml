@@ -7,6 +7,11 @@ services:
       - "8001:8001"
     volumes:
       - ./:/app
-      # - ./uploads:/app/uploads
-
-        #    restart: always
+  react:
+    build: ./frontend
+    tty: true
+    stdin_open: true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/:/app

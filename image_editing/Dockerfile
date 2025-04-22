@@ -16,6 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 動画アップロード用のディレクトリを作成
 #RUN mkdir -p /app/uploads
 
-# FastAPI アプリを起動
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Django API アプリを起動
 CMD ["python", "manage.py", "runserver", "--settings", "config.settings.dev", "0.0.0.0:8001"]
