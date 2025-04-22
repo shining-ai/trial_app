@@ -10,7 +10,6 @@ import base64
 import requests
 
 class ResizeImageView(APIView):
-    # parser_classes = (MultiPartParser)
     def get(self, request):
         return Response({'message': 'GET request received'})
 
@@ -19,7 +18,20 @@ class ResizeImageView(APIView):
         if not image:
             return Response({'error': 'No image provided'}, status=400)
         resized_image = resize_image_to_base64(image)
+        if not resized_image:
+            return Response({'error': 'Failed to resize image'}, status=500)
         return Response({'resized_image': resized_image})
+
+
+# 共通：画像リサイズ処理
+def resize_image_to_base64(image_file, size=(300, 300)):
+    img = Image.open(image_file)
+    img = img.convert("RGB")
+    img.thumbnail(size)
+    buffer = BytesIO()
+    img.save(buffer, format='JPEG')
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
 
 # 画像リサイズのためのフォーム(仮でDjangoのテンプレートを使用)
 def resize_form_view(request):
@@ -38,12 +50,3 @@ def resize_form_view(request):
     context['resized_image'] = resizeed_image
     return render(request, 'image_editing/resize_form.html', context)
 
-
-# 共通：画像リサイズ処理
-def resize_image_to_base64(image_file, size=(300, 300)):
-    img = Image.open(image_file)
-    img = img.convert("RGB")
-    img.thumbnail(size)
-    buffer = BytesIO()
-    img.save(buffer, format='JPEG')
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
