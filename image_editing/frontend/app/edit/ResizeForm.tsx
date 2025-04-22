@@ -7,11 +7,12 @@ import ImagePreview from './ImagePreview';
 export default function ResizeForm() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [width, setWidth] = useState<number>(300);
-  const [height, setHeight] = useState<number>(300);
+  const [width, setWidth] = useState<number>(0);
+  const [height, setHeight] = useState<number>(0);
 
   const { resizeImage, error } = useResizeImage();
 
+  // 画像のサイズを取得してフォームに設定する
   const updateSizeFromImageUrl = (url: string) => {
     const img = new Image();
     img.onload = () => {
@@ -21,18 +22,18 @@ export default function ResizeForm() {
     img.src = url;
   };
 
+  // 画像の選択をする
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
       const imageUrl = URL.createObjectURL(file);
       setPreviewUrl(imageUrl);
-
-      // 画像のwidth/heightを取得して初期値に設定
       updateSizeFromImageUrl(imageUrl);
     }
   };
 
+  // 画像のリサイズをする
   const handleResize = async (e: FormEvent) => {
     e.preventDefault();
     if (!imageFile) return;
