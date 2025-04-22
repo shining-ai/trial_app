@@ -9,6 +9,9 @@ from io import BytesIO
 import base64
 import requests
 
+MAX_SIZE = 5000
+MINIMUM_SIZE = 50
+
 class ResizeImageView(APIView):
     def get(self, request):
         return Response({'message': 'GET request received'})
@@ -17,19 +20,31 @@ class ResizeImageView(APIView):
         image = request.FILES.get('image')        
         if not image:
             return Response({'error': 'No image provided'}, status=400)
-        resized_image = resize_image_to_base64(image)
+        # width, heightは指定したものだけが送られてくる。(もう片方は0が送られてくる想定)
+        width = request.POST.get('width')
+        height = request.POST.get('height')
+        if not width and not height:
+            return Response({'error': 'Width or height are required'}, status=400)
+        resized_image = resize_image_to_base64(image, min(int(width), MAX_SIZE), min(int(height), MAX_SIZE))
         if not resized_image:
             return Response({'error': 'Failed to resize image'}, status=500)
         return Response({'resized_image': resized_image})
 
 
 # 共通：画像リサイズ処理
-def resize_image_to_base64(image_file, size=(300, 300)):
+def resize_image_to_base64(image_file, width=0, height=0):
     img = Image.open(image_file)
     img = img.convert("RGB")
-    img.thumbnail(size)
+    if width <= 0 and height <= 0:
+        ratio = 1.0
+    if 0 < width:
+        ratio = max(width, MINIMUM_SIZE) / img.width
+    elif 0 < height:
+        ratio = max(height, MINIMUM_SIZE) / img.height
+    size = (int(img.width * ratio), int(img.height * ratio))
+    resized_img = img.resize(size)
     buffer = BytesIO()
-    img.save(buffer, format='JPEG')
+    resized_img.save(buffer, format='JPEG', quality=85)
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 

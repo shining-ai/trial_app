@@ -43,6 +43,26 @@ export default function ResizeForm() {
     updateSizeFromImageUrl(result);
   };
 
+  // widthを基準に画像をリサイズする
+  const handleWidthChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    if (!imageFile) return;
+    const result = await resizeImage(imageFile, width, 0);
+    if (!result) return;
+    setPreviewUrl(result);
+    updateSizeFromImageUrl(result);
+  };
+
+  // heightを基準に画像をリサイズする
+  const handleHeightChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    if (!imageFile) return;
+    const result = await resizeImage(imageFile, 0, height);
+    if (!result) return;
+    setPreviewUrl(result);
+    updateSizeFromImageUrl(result);
+  };
+
 
 
   return (
@@ -51,10 +71,10 @@ export default function ResizeForm() {
       <ImagePreview previewUrl={previewUrl} />
       <div>
         <label>Width:
-          <input type="number" value={width} onChange={(e) => setWidth(Number(e.target.value))} onBlur={handleResize} />
+          <input type="number" value={width} onChange={(e) => setWidth(Number(e.target.value))} onBlur={handleWidthChange} />
         </label>
         <label>Height:
-          <input type="number" value={height} onChange={(e) => setHeight(Number(e.target.value))} onBlur={handleResize} />
+          <input type="number" value={height} onChange={(e) => setHeight(Number(e.target.value))} onBlur={handleHeightChange} />
         </label>
       </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
