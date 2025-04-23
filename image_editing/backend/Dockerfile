@@ -11,10 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ソースコードをコンテナ内にコピー
-# COPY . .
-
-# 動画アップロード用のディレクトリを作成
-#RUN mkdir -p /app/uploads
+COPY . .
 
 # Django API アプリを起動
 CMD ["python", "manage.py", "runserver", "--settings", "config.settings.dev", "0.0.0.0:8001"]
