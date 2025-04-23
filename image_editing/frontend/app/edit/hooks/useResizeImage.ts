@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useState } from 'react';
 
 export function useResizeImage() {
-    const [resizedImage, setResizedImage] = useState('');
+    // const [resizedImage, setResizedImage] = useState('');
     const [error, setError] = useState('');
 
     const resizeImage = async (
