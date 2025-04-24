@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useState } from 'react';
 
 export function useResizeImage() {
-    // const [resizedImage, setResizedImage] = useState('');
     const [error, setError] = useState('');
 
     const resizeImage = async (
@@ -34,29 +33,3 @@ export function useResizeImage() {
     };
     return { resizeImage, error };
 }
-
-
-
-
-//         formData.append('image', imageFile);
-//         formData.append('width', String(width));
-//         formData.append('height', String(height));
-
-//         try {
-//             const res = await fetch('http://localhost:8001/api/resize_image/resize/', {
-//                 method: 'POST',
-//                 body: formData,
-//             });
-
-//             if (!res.ok) throw new Error(`エラー: ${res.status}`);
-
-//             const data = await res.json();
-//             setResizedImage(`data:image/png;base64,${data.resized_image}`);
-//             setError('');
-//         } catch (err: any) {
-//             setError(err.message || '通信エラー');
-//         }
-//     };
-
-//     return { resizedImage, error, resizeImage };
-// }
