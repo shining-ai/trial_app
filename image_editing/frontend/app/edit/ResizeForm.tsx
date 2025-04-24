@@ -77,6 +77,15 @@ export default function ResizeForm() {
           <input type="number" value={height} onChange={(e) => setHeight(Number(e.target.value))} onBlur={handleHeightChange} />
         </label>
       </div>
+      <div>
+        <a
+          href={previewUrl}
+          download="resized_image.jpg"
+          style={{ display: 'inline-block', marginTop: '1rem', padding: '0.5rem 1rem', background: '#007bff', color: 'white', borderRadius: '4px', textDecoration: 'none' }}
+        >
+          Download Resized Image
+        </a>
+      </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
     </form>
   );
