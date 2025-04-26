@@ -14,7 +14,7 @@ MINIMUM_SIZE = 50
 
 class ResizeImageView(APIView):
     def get(self, request):
-        return Response({'message': 'GET request received'})
+        return Response({'message': 'Resize API GET request received'})
 
     def post(self, request):
         image = request.FILES.get('image')        
@@ -29,7 +29,35 @@ class ResizeImageView(APIView):
         if not resized_image:
             return Response({'error': 'Failed to resize image'}, status=500)
         return Response({'resized_image': resized_image})
+    
+class CropImageView(APIView):
+    def get(self, request):
+        return Response({'message': 'crop API GET request received'})
 
+    def post(self, request):
+        image = request.FILES.get('image')
+        if not image:
+            return Response({'error': 'No image provided'}, status=400)
+        x1 = request.POST.get('x1')
+        y1 = request.POST.get('y1')
+        x2 = request.POST.get('x2')
+        y2 = request.POST.get('y2')
+        if not x1 and not y1 and not x2 and not y2:
+            return Response({'error': 'x1, y1, x2, y2 are required'}, status=400)
+        cropped_image = crop_image_to_base64(image, int(x1), int(y1), int(x2), int(y2))
+        if not cropped_image:
+            return Response({'error': 'Failed to crop image'}, status=500)
+        return Response({'cropped_image': cropped_image})
+
+
+# 画像トリミング処理
+def crop_image_to_base64(image_file, x1, y1, x2, y2):
+    img = Image.open(image_file)
+    img = img.convert("RGB")
+    cropped_img = img.crop((x1, y1, x2, y2))
+    buffer = BytesIO()
+    cropped_img.save(buffer, format='JPEG', quality=85)
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 # 共通：画像リサイズ処理
 def resize_image_to_base64(image_file, width=0, height=0):
