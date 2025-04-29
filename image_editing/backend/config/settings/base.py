@@ -126,8 +126,10 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "https://edit-image-gamma.vercel.app/edit",
+    "https://edit-image-gamma.vercel.app",
+    "http://react:3000",
     "http://localhost:3000",
+    "http://192.168.1.17:3000",
 ]
 # 開発用(CORS設定)
 # CORS_ALLOW_ALL_ORIGINS = True

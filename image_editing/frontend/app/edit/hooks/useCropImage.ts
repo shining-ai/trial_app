@@ -35,7 +35,8 @@ export function useCropImage() {
         formData.append('y1', String(y1));
         formData.append('x2', String(x2));
         formData.append('y2', String(y2));
-        const response = await axios.post('http://192.168.1.17:8001/api/image-editing/crop/', formData, {
+        // const response = await axios.post('http://192.168.1.17:8001/api/image-editing/crop/', formData, {
+        const response = await axios.post('https://edit-image-c5ys.onrender.com/api/image-editing/crop/', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
