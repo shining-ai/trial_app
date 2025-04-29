@@ -9,5 +9,6 @@ RUN yarn install
 
 COPY . .
 RUN yarn build
-# React アプリを起動
+
 CMD ["yarn", "start"]
+# CMD ["yarn", "dev"]

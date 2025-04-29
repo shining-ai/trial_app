@@ -46,7 +46,7 @@ class CropImageView(APIView):
             return Response({'error': 'x1, y1, x2, y2 are required'}, status=400)
         cropped_image = crop_image_to_base64(image, int(x1), int(y1), int(x2), int(y2))
         if not cropped_image:
-            return Response({'error': 'Failed to crop image'}, status=500)
+            return Response({'error': 'Failed to crop image'}, status=400)
         return Response({'cropped_image': cropped_image})
 
 

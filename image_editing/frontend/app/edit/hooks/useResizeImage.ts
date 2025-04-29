@@ -12,10 +12,10 @@ export function useResizeImage() {
     ) => {
         const formData = new FormData();
         formData.append('image', imageFile);
-        formData.append('width', String(width));
-        formData.append('height', String(height));
-        // const response = await axios.post('http://192.168.1.17:8001/api/image-editing/resize/', formData, {
-        const response = await axios.post('https://edit-image-c5ys.onrender.com/api/image-editing/resize/', formData, {
+        formData.append('width', String(Math.round(width)));
+        formData.append('height', String(Math.round(height)));
+        const response = await axios.post('http://192.168.1.17:8001/api/image-editing/resize/', formData, {
+            // const response = await axios.post('https://edit-image-c5ys.onrender.com/api/image-editing/resize/', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
