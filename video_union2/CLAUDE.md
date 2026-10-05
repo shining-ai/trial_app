@@ -29,3 +29,5 @@
 - `docker compose exec backend pytest` — バックエンドのテスト
 - `docker compose exec frontend npx vitest run` — フロントエンドのテスト
 - `cd e2e && npx playwright test` — E2Eテスト(アプリ起動中に実行)
+- `docker compose logs backend` — バックエンドのコンテナのログ確認
+- `docker compose logs frontend` — フロントエンドのコンテナのログ確認
