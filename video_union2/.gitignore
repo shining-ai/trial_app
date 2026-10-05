@@ -1,0 +1,7 @@
+# リポジトリ直下の .gitignore(Python向けテンプレート)で除外されるもののうち、このアプリで必要なものを戻す
+
+# backend/app/lib/ と frontend/src/lib/ の共通処理
+!lib/
+
+# テスト用の動画
+!backend/tests/fixtures/*.mp4
