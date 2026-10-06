@@ -17,6 +17,8 @@
 - `frontend/src/lib/` — フロントエンドの共通処理
 - `e2e/` — Playwrightによるアプリ全体の通しテスト
 - `.claude/rules/` — 開発ルール
+- `.claude/plans/` — 機能ごとの実装プラン(受け入れ条件とテストケース一覧)
+- `.claude/agents/` — レビュー用のサブエージェント
 - `docs/product.md` — プロダクトの目的、対象ユーザー、ゴール
 - `docs/requirements/` — 機能ごとの要件定義
 
