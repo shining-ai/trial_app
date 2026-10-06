@@ -1,0 +1,23 @@
+from app.features.upload.video_metadata_store import delete_metadata
+from app.lib.disk_storage import DiskStorage, InvalidIdError
+from app.lib.errors import AppError
+from app.lib.logger import log_error
+
+_NOT_FOUND = AppError(404, "video_not_found", "指定された動画が見つかりません")
+
+
+def delete_video(video_id: str, storage: DiskStorage) -> None:
+    """アップロード済みの動画ファイルとメタ情報を消す。"""
+    try:
+        video = storage.upload_video_path(video_id)
+        metadata = storage.upload_metadata_path(video_id)
+    except InvalidIdError as e:
+        raise _NOT_FOUND from e
+    if not video.exists() and not metadata.exists():
+        raise _NOT_FOUND
+    try:
+        video.unlink(missing_ok=True)
+        delete_metadata(metadata)
+    except OSError as e:
+        log_error("upload.delete_video", "動画の削除に失敗しました", err=e, video_ids=[video_id])
+        raise

@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.features.health.router import router as health_router
+from app.features.upload.router import router as upload_router
+from app.lib.cleanup_stale_files import cleanup_stale_files
 from app.lib.config import Settings
 from app.lib.disk_storage import DiskStorage
 from app.lib.errors import register_error_handlers
@@ -21,6 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         use_startup_request_id()
         storage.uploads_dir().mkdir(parents=True, exist_ok=True)
         storage.merges_dir().mkdir(parents=True, exist_ok=True)
+        cleanup_stale_files(storage, settings.stale_file_hours)
         yield
 
     app = FastAPI(title="動画結合アプリ", lifespan=lifespan)
@@ -29,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
     app.include_router(health_router)
+    app.include_router(upload_router)
     return app
 
 
