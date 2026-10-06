@@ -2,7 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.features.download.router import router as download_router
 from app.features.health.router import router as health_router
+from app.features.merge.merge_job_store import MergeJobStore
+from app.features.merge.router import router as merge_router
 from app.features.upload.router import router as upload_router
 from app.lib.cleanup_stale_files import cleanup_stale_files
 from app.lib.config import Settings
@@ -29,10 +32,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="動画結合アプリ", lifespan=lifespan)
     app.state.settings = settings
     app.state.storage = storage
+    app.state.merge_jobs = MergeJobStore()
     app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(upload_router)
+    app.include_router(merge_router)
+    app.include_router(download_router)
     return app
 
 

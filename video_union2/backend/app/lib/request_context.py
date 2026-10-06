@@ -27,8 +27,15 @@ class RequestIdMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        token = _request_id.set(generate_id())
+        request_id = generate_id()
+        token = _request_id.set(request_id)
+
+        async def send_with_request_id(message):
+            if message["type"] == "http.response.start":
+                message.setdefault("headers", []).append((b"x-request-id", request_id.encode()))
+            await send(message)
+
         try:
-            await self.app(scope, receive, send)
+            await self.app(scope, receive, send_with_request_id)
         finally:
             _request_id.reset(token)
