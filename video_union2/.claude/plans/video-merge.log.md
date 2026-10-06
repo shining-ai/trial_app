@@ -192,4 +192,5 @@ $ docker compose --profile e2e down
 ### ラウンド2(途中)
 
 - security-reviewer: P0・P1 なし。P2 が6件(chunked 送信・同時アップロードでは空き容量の確認が効かない、`rotate` タグの nan・inf で500、途中で解像度が変わる H.264、コーデックの許可リストがない、`POST /api/merges` の本文の大きさに上限がない、ファイル名の制御文字)。観点の外で、`compose.yaml` のポート `8000:8000` が全インターフェースで待ち受ける点の指摘あり
-- design-reviewer・edge-case-reviewer: 利用上限に達したため、結果を受け取る前に作業を止めた(未記録)
+- design-reviewer: P0 なし。P1 が4件(未対応): 受信中の4GB超過の打ち切りを通るテストがない(TestClient が常に Content-Length を付けるため受信前の判定だけで通る)、`file:` 参照の HLS が許可リストで拒否された証拠を確かめていない、T14「結合できる状態に戻る」を確かめていない、削除と起動時の掃除の失敗ログに `ms` がない。要確認: 利用者の入力による422も error で記録している、upload.md と R8 の本文が I19 に追いついていない、「結合中です」はプランにない文言
+- edge-case-reviewer: 利用上限に達したため、結果を受け取る前に作業を止めた(未記録)
