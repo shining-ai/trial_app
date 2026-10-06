@@ -2,14 +2,14 @@
 
 ## 種別と実行コマンド
 
-テストは、アプリを起動した状態で実行する(`docker compose up --build`)。
+どのテストも、事前にアプリを起動しなくても1コマンドで実行できる。E2Eは backend と frontend を起動し、healthcheck が通るのを待ってから実行する(終了後もアプリは起動したまま残るので、止めるときは `docker compose down`)。
 
 | 種別 | ツール | 置き場所 | 実行 | 何を守るか |
 |---|---|---|---|---|
-| 単体(backend) | pytest | `backend/tests/unit/`(`app/` の構造を再現) | `docker compose exec backend pytest` | 引数の組み立てや入力チェックの境界値と異常系 |
-| 結合(backend) | pytest | `backend/tests/integration/` | `docker compose exec backend pytest` | 本物のFFmpegを使ったAPIの動作 |
-| 単体(frontend) | Vitest | `frontend/tests/unit/`(`src/` の構造を再現) | `docker compose exec frontend npx vitest run` | 並び替えなど画面側のロジック |
-| E2E | Playwright | `e2e/` | `cd e2e && npx playwright test` | アップロードからダウンロードまでの完走 |
+| 単体(backend) | pytest | `backend/tests/unit/`(`app/` の構造を再現) | `docker compose run --rm --build backend pytest` | 引数の組み立てや入力チェックの境界値と異常系 |
+| 結合(backend) | pytest | `backend/tests/integration/` | `docker compose run --rm --build backend pytest` | 本物のFFmpegを使ったAPIの動作 |
+| 単体(frontend) | Vitest | `frontend/tests/unit/`(`src/` の構造を再現) | `docker compose run --rm --build frontend npx vitest run` | 並び替えなど画面側のロジック |
+| E2E | Playwright | `e2e/` | `docker compose run --rm --build e2e` | アップロードからダウンロードまでの完走 |
 
 - 実行コマンドは `CLAUDE.md` の主要コマンドと同じものを使う。上の表にないコマンドで代用しない
 - 単体テストの置き場所は、対象ファイルのパスを再現する

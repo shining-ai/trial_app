@@ -10,7 +10,7 @@
 
 ## ディレクトリ構成
 - `compose.yaml` — サービス定義と保存用volume
-- `backend/app/features/` — 機能ごとのコード(upload: アップロード、merge: 並び順に沿った結合、download: 結合結果の配信)
+- `backend/app/features/` — 機能ごとのコード(upload: アップロード、merge: 並び順に沿った結合、download: 結合結果の配信、health: 稼働確認)
 - `backend/app/lib/` — 機能横断の共通処理(設定、ログ、子プロセス実行、ディスク保存など)
 - `backend/tests/` — 単体テスト(unit/)と結合テスト(integration/)
 - `frontend/src/features/` — 機能ごとの画面とAPI呼び出し(バックエンドと同じ機能名で区切る)
@@ -26,8 +26,9 @@
 
 ## 主要コマンド
 - `docker compose up --build` — アプリ起動
-- `docker compose exec backend pytest` — バックエンドのテスト
-- `docker compose exec frontend npx vitest run` — フロントエンドのテスト
-- `cd e2e && npx playwright test` — E2Eテスト(アプリ起動中に実行)
+- `docker compose down` — アプリ停止
+- `docker compose run --rm --build backend pytest` — バックエンドのテスト
+- `docker compose run --rm --build frontend npx vitest run` — フロントエンドのテスト
+- `docker compose run --rm --build e2e` — E2Eテスト(backend と frontend を起動し、起動完了を待ってから実行する)
 - `docker compose logs backend` — バックエンドのコンテナのログ確認
 - `docker compose logs frontend` — フロントエンドのコンテナのログ確認

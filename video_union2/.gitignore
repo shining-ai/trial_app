@@ -5,3 +5,6 @@
 
 # テスト用の動画
 !backend/tests/fixtures/*.mp4
+
+# 依存パッケージ
+node_modules/

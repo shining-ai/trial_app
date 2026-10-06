@@ -1,0 +1,20 @@
+[project]
+name = "video-union-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "httpx2==2.13.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# コンテナはrootで動き、backend/ はホストからマウントしているため、キャッシュを書き出さない
+addopts = "-p no:cacheprovider"

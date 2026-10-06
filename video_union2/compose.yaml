@@ -1,0 +1,50 @@
+services:
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      STORAGE_DIR: /data
+    volumes:
+      - ./backend:/app
+      - media:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      BACKEND_URL: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      # イメージ内でインストールした node_modules をマウントで隠さない
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # E2Eテスト専用。`docker compose run` で呼んだときだけ動き、backend と frontend の起動を待ってから実行する
+  e2e:
+    build: ./e2e
+    profiles: ["e2e"]
+    environment:
+      BASE_URL: http://frontend:5173
+    volumes:
+      - ./e2e:/e2e
+      - /e2e/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+volumes:
+  media:
