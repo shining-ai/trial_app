@@ -196,7 +196,8 @@
 テストの土台として足すもの:
 - `backend/tests/support/make_video.py`: FFmpeg の `testsrc`・`color`・`sine` で、サイズ・長さ・fps・色・音声の有無・回転情報・入れ物とコーデック(mp4/H.264、webm/VP9、mkv/MPEG-4 Part 2)・可変フレームレートを指定して動画を作る
 - `backend/tests/conftest.py`: 一時ディレクトリと小さい上限の `Settings`、それを使う `TestClient` の fixture
-- `backend/tests/fixtures/`: `not_a_video.mp4`(中身はテキスト)、`still.png`(静止画)、`playlist.m3u8`(同じ一時ディレクトリの動画を参照するHLSの再生リスト)、`list.ffconcat`(ffconcat の一覧)
+- `backend/tests/fixtures/`: `not_a_video.mp4`(中身はテキスト)だけを置く。静止画の PNG、HLS の再生リスト、ffconcat の一覧は、参照先のパスがテストごとに変わるため、テストの中で作る(testing.md「作れないものだけを fixtures に置く」)
+- `backend/tests/support/probe.py`(ffprobe の結果を読む)、`sample_pixel.py`(フレームの色を読む。プラン2で使う)
 
 ## 5. 新規テストケース
 
@@ -210,13 +211,16 @@
 - 横長 1920x1080・回転なしの JSON から、表示サイズ 1920x1080、長さ、fps(分数)、音声ありを取り出す
 - 回転 -90 の 1920x1080 は、表示サイズ 1080x1920 になる(90、270 も同様)
 - 映像に `duration` がないときは `format.duration` を使う
+- 映像の `duration=1.0`・`format.duration=2.0`(音声のほうが長い)なら、長さは 1.0(映像の長さで数える。T1)
 - 音声ストリームがないときは音声なしになる
 - 映像ストリームが2つあるときは最初のものを使う
+- 音声ストリームが2つあるときは最初のものを使う(T9)
 
 **`features/upload/test_validate_video_info.py`**
-- `format_name` が `mov,mp4,m4a,3gp,3g2,mj2`・`matroska,webm`・`avi` は許可。`png_pipe`・`image2`・`gif`・`hls`・`concat` は `not_a_video` と「動画として読み込めませんでした」
+- `format_name` が `mov,mp4,m4a,3gp,3g2,mj2`・`matroska,webm`・`avi`・`mpegts`・`mpeg`・`asf`・`flv` は許可。`png_pipe`・`image2`・`gif`・`apng`・`webp_pipe`・`hls`・`concat` は `not_a_video` と「動画として読み込めませんでした」(T3)
 - 3840x2160 ちょうどは受け付ける。3841x2160、3840x2161 は拒否し、「解像度 3841x2160 は上限 3840x2160 を超えています」
 - 縦長 2160x3840 ちょうどは受け付ける。2160x3841 は拒否し、「解像度 2160x3841 は上限 2160x3840 を超えています」
+- 正方形 2160x2160 は受け付け、2161x2161 は短辺の超過で拒否し、「解像度 2161x2161 は上限 3840x2160 を超えています」(幅≧高さは横長として扱う。T4)
 - 長さ 0 秒・長さなしは拒否する。0.001 秒は受け付ける
 - 映像ストリームなし(音声だけ)は拒否する
 
@@ -236,6 +240,7 @@
 ### バックエンド結合(`backend/tests/integration/`。本物の FFmpeg を使う)
 
 **`features/upload/test_upload_api.py`**
+- 映像1秒・音声2秒の動画を送ると、応答の長さは 1.0秒±0.05(T1)
 - 2秒・640x360・音声ありの動画を送ると201になり、応答の長さ(2.0秒±0.05)・幅・高さが正しく、`.bin` と `.json` が保存され、`.json` が上の形式どおり
 - webm/VP9 と mkv/MPEG-4 Part 2 の動画も201になる
 - 回転情報 90 付きの 640x360 を送ると、応答は 360x640 になる
@@ -243,7 +248,8 @@
 - `not_a_video.mp4`(テキスト)・`still.png`・`playlist.m3u8`・`list.ffconcat` は422・「動画として読み込めませんでした」になり、保存先にファイルが残らない
 - `playlist.m3u8` の検証中に、再生リストが参照する動画ファイルが開かれない(ffprobe が許可リストで拒否する)
 - 上限を小さくした設定(`MAX_UPLOAD_BYTES` を作った動画のサイズちょうど)で、ちょうどのサイズは201、1バイト超は413になり、`.part` が残らない
-- 上限を小さくした設定(`MAX_LONG_SIDE=640`、`MAX_SHORT_SIDE=360`)で、640x360 は201、641x360 は422 になり、メッセージに「641x360」を含む
+- 上限を小さくした設定(`MAX_LONG_SIDE=640`、`MAX_SHORT_SIDE=360`)で、640x360 は201、641x360 は422 になり、メッセージに「641x360」を含み、`.bin`・`.json`・`.part` が残らない(T6)
+- 同じ設定で、回転90の 640x360 は201(表示は 360x640)、回転90の 641x360 は422 でメッセージに「360x641」を含む(T5)
 - `X-File-Name` がないと422になる
 - `X-File-Name` に `../../etc/passwd` を入れても、保存先の外にファイルができない(保存名はIDだけ)
 - `DELETE` で動画とメタ情報が消え、204になる。存在しないIDは404、形式が不正なIDは404
@@ -256,15 +262,18 @@
 - `timeout_seconds` を超えるコマンド(`sleep` 相当)は止められ、`ProcessFailedError` になる
 
 **`lib/test_cleanup_stale_files.py`**
-- 更新時刻が24時間より古いファイルだけを消し、新しいファイルは残す
-- 削除に失敗するファイル(書き込み権限のないフォルダ)があると、error を記録して例外を送出する
+- 更新時刻が24時間+1秒前のファイルは消え、24時間-1秒前のファイルは残る(時刻は `os.utime` で設定する。T12)
+- 古いジョブのフォルダ(`merges/{job_id}/`)は中身ごと消える
+- `uploads/` に消せないもの(中身のあるフォルダ)があると、error を記録して例外を送出する(コンテナは root で動くため、権限では削除の失敗を作れない)
+- `create_app` の起動処理(lifespan)を通すと、古いファイルが消える(T12)
 
 ### フロントエンド単体(`frontend/tests/unit/features/upload/`)
 
-- `checkFileSize.test.ts`: 4GBちょうどは許可、4GB+1バイトは拒否、0バイトは許可(判定はサーバーに任せる)
-- `limitSelection.test.ts`: 残り枠3で5ファイル選ぶと3ファイルと切り捨て2を返す。残り枠0なら全部切り捨て。残り枠以内ならそのまま。結合リスト90本・送信中2本・待機中6本なら残り枠2
+- `checkFileSize.test.ts`: 4294967296 バイト(サーバーの `MAX_UPLOAD_BYTES` と同じ値)は許可、4294967297 バイトは拒否、0バイトは許可(判定はサーバーに任せる。T17)
+- `limitSelection.test.ts`: 残り枠3で5ファイル選ぶと3ファイルと切り捨て2を返す。残り枠0なら全部切り捨て。残り枠以内ならそのまま。結合リスト90本・送信中2本・待機中6本なら残り枠2。結合リスト99本なら残り枠1、100本なら残り枠0(T13)
 - `pickNextUploads.test.ts`: 送信中0本なら待機中の先頭2本、送信中1本なら1本、送信中2本なら0本を選ぶ。選ぶ順は選んだ順
 - `UploadList.test.tsx`: 送信中は進み具合(%)、失敗はサーバーの `message`、完了は長さと解像度を表示する
+- `UploadForm.test.tsx`: 残り枠が0のときはファイル選択を押せず、「一度に結合できるのは100本までです」を表示する(T13)
 - `useUploadQueue.test.ts`(`uploadVideo` は差し替えて送信の開始と完了を制御する。プロセス外の通信の制御が目的で、成功を返し続けるモックにはしない)
   - 3ファイルを入れると同時に2本だけ送信が始まり、1本終わると3本目が始まる
   - 4GB超のファイルは `uploadVideo` が呼ばれず、失敗の理由が「ファイルサイズが上限の4GBを超えています」になる
