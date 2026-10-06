@@ -43,6 +43,7 @@
 
 - 各テストが自分専用のファイルと保存先を作り、終了時に片付ける
 - 他のテストが作ったデータや実行順序に依存しない
-- テスト用の動画は `backend/tests/fixtures/` の数秒のものを使い、テスト内で書き換えない
+- テスト用の動画は、テストのたびにFFmpegの `testsrc` や単色の映像で数秒のものを作る(補助関数 `backend/tests/support/make_video.py`)
+- 作れないもの(拡張子だけ動画のテキストファイルなど)だけを `backend/tests/fixtures/` に置き、テスト内で書き換えない
 - Playwrightでは `waitForTimeout` で待たず、ロケータの自動待機を使う
 - セレクタはrole、label、testidを優先し、CSSクラスに依存しない
