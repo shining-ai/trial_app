@@ -13,3 +13,5 @@ class VideoInfo:
     fps_num: int
     fps_den: int
     has_audio: bool
+    video_stream_index: int | None
+    audio_stream_index: int | None

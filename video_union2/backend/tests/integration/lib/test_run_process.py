@@ -61,3 +61,29 @@ async def test_ffmpeg_success_is_logged_as_info_but_fast_ffprobe_success_is_not(
     infos = [r for r in caplog.records if r.levelno == logging.INFO]
     assert [r.fields["program"] for r in infos] == ["ffmpeg"]
     assert "ms" in infos[0].fields
+
+
+async def test_cancelled_run_stops_the_child_process(tmp_path):
+    import asyncio
+
+    marker = tmp_path / "pid"
+    task = asyncio.create_task(run_process(["sh", "-c", f"echo $$ > {marker}; exec sleep 30"], timeout_seconds=60))
+    while not marker.exists() or not marker.read_text().strip():
+        await asyncio.sleep(0.05)
+    pid = int(marker.read_text())
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    import os
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+async def test_very_long_stdout_line_is_passed_whole():
+    lines = []
+
+    await run_process(["python3", "-c", "print('x' * 70000); print('end')"], timeout_seconds=10, on_stdout_line=lines.append)
+
+    assert [len(line) for line in lines] == [70000, 3]

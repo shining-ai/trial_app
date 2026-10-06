@@ -48,9 +48,16 @@ async def run_process(
     stderr_tail: deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
 
     async def read_stdout():
-        async for raw in process.stdout:
+        # 1行の長さに上限を設けないよう、行単位ではなく塊で読んで自分で区切る
+        pending = b""
+        while chunk := await process.stdout.read(65536):
+            pending += chunk
+            *lines, pending = pending.split(b"\n")
             if on_stdout_line is not None:
-                on_stdout_line(raw.decode(errors="replace").rstrip("\n"))
+                for raw in lines:
+                    on_stdout_line(raw.decode(errors="replace"))
+        if pending and on_stdout_line is not None:
+            on_stdout_line(pending.decode(errors="replace"))
 
     async def read_stderr():
         async for raw in process.stderr:
@@ -61,8 +68,11 @@ async def run_process(
         await asyncio.wait_for(asyncio.gather(read_stdout(), read_stderr(), process.wait()), timeout_seconds)
     except TimeoutError:
         timed_out = True
-        process.kill()
-        await process.wait()
+        await _stop(process)
+    except BaseException:
+        # 取り消しやその他の例外でも、子プロセスを残さない
+        await _stop(process)
+        raise
 
     elapsed_ms = round((time.monotonic() - started) * 1000)
     if timed_out or process.returncode != 0:
@@ -83,3 +93,12 @@ async def run_process(
     if program == "ffmpeg" or elapsed_ms > _SLOW_SECONDS * 1000:
         log_info("lib.run_process", f"{program} が成功しました", program=program, ms=elapsed_ms)
     return ProcessResult(returncode=process.returncode, stderr_tail=list(stderr_tail))
+
+
+async def _stop(process: asyncio.subprocess.Process) -> None:
+    if process.returncode is None:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+    await asyncio.shield(process.wait())

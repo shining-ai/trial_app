@@ -8,8 +8,8 @@ def _probe(streams, format_name="mov,mp4,m4a,3gp,3g2,mj2", duration="2.000000"):
     return {"streams": streams, "format": fmt}
 
 
-def _video(width=1920, height=1080, duration="2.000000", rate="30/1", rotation=None, attached_pic=0):
-    stream = {"codec_type": "video", "width": width, "height": height, "avg_frame_rate": rate,
+def _video(width=1920, height=1080, duration="2.000000", rate="30/1", rotation=None, attached_pic=0, index=0):
+    stream = {"index": index, "codec_type": "video", "width": width, "height": height, "avg_frame_rate": rate,
               "disposition": {"attached_pic": attached_pic}}
     if duration is not None:
         stream["duration"] = duration
@@ -18,7 +18,7 @@ def _video(width=1920, height=1080, duration="2.000000", rate="30/1", rotation=N
     return stream
 
 
-AUDIO = {"codec_type": "audio", "sample_rate": "48000", "channels": 2}
+AUDIO = {"index": 1, "codec_type": "audio", "sample_rate": "48000", "channels": 2}
 
 
 def test_landscape_video_without_rotation():
@@ -101,3 +101,35 @@ def test_zero_avg_frame_rate_falls_back_to_r_frame_rate():
     info = parse_probe_output(_probe([stream]))
 
     assert (info.fps_num, info.fps_den) == (25, 1)
+
+
+def test_stream_indexes_of_first_video_and_audio_are_kept():
+    cover = _video(width=600, height=600, attached_pic=1, index=0)
+    main = _video(width=640, height=360, index=1)
+    audio = dict(AUDIO, index=2)
+
+    info = parse_probe_output(_probe([cover, main, audio, dict(AUDIO, index=3)]))
+
+    assert (info.video_stream_index, info.audio_stream_index) == (1, 2)
+
+
+def test_audio_stream_index_is_none_without_audio():
+    assert parse_probe_output(_probe([_video()])).audio_stream_index is None
+
+
+def test_matroska_duration_tag_is_used_for_video_length():
+    stream = _video(duration=None)
+    stream["tags"] = {"DURATION": "00:00:01.500000000"}
+
+    info = parse_probe_output(_probe([stream, AUDIO], format_name="matroska,webm", duration="2.008000"))
+
+    assert info.duration_seconds == 1.5
+
+
+def test_non_integer_rotate_tag_is_accepted():
+    stream = _video()
+    stream["tags"] = {"rotate": "90.0"}
+
+    info = parse_probe_output(_probe([stream]))
+
+    assert (info.width, info.height) == (1080, 1920)

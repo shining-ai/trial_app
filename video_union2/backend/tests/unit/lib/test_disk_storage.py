@@ -16,6 +16,7 @@ def test_upload_paths_are_inside_uploads_dir(storage, tmp_path):
     assert storage.upload_video_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.bin"
     assert storage.upload_metadata_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.json"
     assert storage.upload_temp_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.part"
+    assert storage.upload_metadata_temp_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.json.tmp"
     assert storage.uploads_dir() == root / "uploads"
 
 

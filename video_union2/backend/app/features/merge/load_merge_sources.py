@@ -31,6 +31,8 @@ def load_merge_sources(video_ids: list[str], storage: DiskStorage) -> list[Merge
                 fps_num=data["fps_num"],
                 fps_den=data["fps_den"],
                 has_audio=data["has_audio"],
+                video_stream_index=data["video_stream_index"],
+                audio_stream_index=data["audio_stream_index"],
             )
         )
     return sources

@@ -10,9 +10,10 @@ OUTPUT = Path("/data/merges/j/parts/0001.mp4")
 FORMAT = OutputFormat(width=1920, height=1080, fps_num=30000, fps_den=1001)
 
 
-def _src(has_audio=True, duration=2.5):
+def _src(has_audio=True, duration=2.5, video_index=0, audio_index=1):
     return MergeSource(video_id="a" * 32, file_name="a.mp4", size_bytes=1, duration_seconds=duration, width=640,
-                       height=360, fps_num=30, fps_den=1, has_audio=has_audio)
+                       height=360, fps_num=30, fps_den=1, has_audio=has_audio, video_stream_index=video_index,
+                       audio_stream_index=audio_index if has_audio else None)
 
 
 def _args(**kwargs):
@@ -33,7 +34,7 @@ def test_video_is_padded_to_output_size_with_black_and_never_scaled():
 def test_video_filter_sets_square_pixels_fixed_fps_and_yuv420p_from_first_video_stream():
     video_chain = _filter(_args()).split(";")[0]
 
-    assert video_chain.startswith("[0:v:0]")
+    assert video_chain.startswith("[0:0]")
     assert "setsar=1" in video_chain
     assert "fps=30000/1001" in video_chain
     assert "format=yuv420p" in video_chain
@@ -57,7 +58,7 @@ def test_video_with_audio_uses_first_audio_stream_without_anullsrc():
     args = _args(has_audio=True)
     audio_chain = _filter(args).split(";")[1]
 
-    assert audio_chain.startswith("[0:a:0]")
+    assert audio_chain.startswith("[0:1]")
     assert not any("anullsrc" in a for a in args)
 
 
@@ -88,3 +89,15 @@ def test_encoding_options_and_progress_output():
         assert args[i:i + 2] == expected
     assert args[-1] == str(OUTPUT)
     assert all(isinstance(a, str) for a in args)
+
+
+def test_streams_are_chosen_by_absolute_index_so_cover_art_is_skipped():
+    args = _args(video_index=2, audio_index=3)
+    video_chain, audio_chain = _filter(args).split(";")
+
+    assert video_chain.startswith("[0:2]")
+    assert audio_chain.startswith("[0:3]")
+
+
+def test_decoding_errors_stop_the_conversion():
+    assert "-xerror" in _args()

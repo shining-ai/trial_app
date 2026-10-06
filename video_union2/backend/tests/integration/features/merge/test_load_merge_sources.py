@@ -18,7 +18,8 @@ def storage(tmp_path):
 
 def _write(storage, video_id, **overrides):
     data = {"version": 1, "id": video_id, "file_name": "a.mp4", "size_bytes": 10, "duration_seconds": 1.5,
-            "width": 640, "height": 360, "fps_num": 30000, "fps_den": 1001, "has_audio": False, **overrides}
+            "width": 640, "height": 360, "fps_num": 30000, "fps_den": 1001, "has_audio": False,
+            "video_stream_index": 1, "audio_stream_index": None, **overrides}
     storage.upload_metadata_path(video_id).write_text(json.dumps(data))
     storage.upload_video_path(video_id).write_bytes(b"video")
 
@@ -34,6 +35,7 @@ def test_metadata_is_read_into_merge_sources_in_request_order(storage):
     assert sources[1].file_name == "a.mp4"
     assert (sources[1].duration_seconds, sources[1].width, sources[1].height) == (1.5, 640, 360)
     assert (sources[1].fps_num, sources[1].fps_den, sources[1].has_audio, sources[1].size_bytes) == (30000, 1001, False, 10)
+    assert (sources[1].video_stream_index, sources[1].audio_stream_index) == (1, None)
 
 
 @pytest.mark.parametrize("bad_id", ["fedcba9876543210fedcba9876543210", "../uploads/x", "0123", "A" * 32])

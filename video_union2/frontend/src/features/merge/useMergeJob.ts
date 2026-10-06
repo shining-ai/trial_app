@@ -6,12 +6,13 @@ import type { MergeJobResponse } from "./types";
 
 const POLL_INTERVAL_MS = 1000;
 const START_FAILED_MESSAGE = "結合を始められませんでした";
-const POLL_FAILED_MESSAGE = "結合の状況を取得できませんでした";
 
 export function useMergeJob() {
   const [job, setJob] = useState<MergeJobResponse | null>(null);
   const [rejectMessage, setRejectMessage] = useState<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
+  // 一時的な失敗のあとも、同じジョブの問い合わせをもう一度予約するための合図
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (job?.status !== "running") return;
@@ -21,15 +22,19 @@ export function useMergeJob() {
         const latest = await fetchMergeJob(job.id);
         if (!cancelled) setJob(latest);
       } catch (error) {
-        const message = error instanceof ApiError ? error.message : POLL_FAILED_MESSAGE;
-        if (!cancelled) setJob({ ...job, status: "failed", error: { code: "poll_failed", message } });
+        if (cancelled) return;
+        if (error instanceof ApiError && error.status === 404) {
+          setJob({ ...job, status: "failed", error: { code: error.code, message: error.message } });
+        } else {
+          setRetryCount((count) => count + 1);
+        }
       }
     }, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [job]);
+  }, [job, retryCount]);
 
   const start = useCallback(async (videoIds: string[]) => {
     setRejectMessage(null);

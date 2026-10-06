@@ -4,7 +4,7 @@ from app.features.merge.plan_output_format import plan_output_format
 
 def _src(width, height, fps=(30, 1)):
     return MergeSource(video_id="a" * 32, file_name="a.mp4", size_bytes=1, duration_seconds=1.0, width=width,
-                       height=height, fps_num=fps[0], fps_den=fps[1], has_audio=True)
+                       height=height, fps_num=fps[0], fps_den=fps[1], has_audio=True, video_stream_index=0, audio_stream_index=1)
 
 
 def test_width_and_height_are_each_maximum():

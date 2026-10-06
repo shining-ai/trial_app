@@ -47,6 +47,8 @@ def test_upload_video_returns_201_with_display_info_and_stores_bin_and_metadata(
         "fps_num": 30,
         "fps_den": 1,
         "has_audio": True,
+        "video_stream_index": 0,
+        "audio_stream_index": 1,
     }
 
 
@@ -261,3 +263,25 @@ def test_upload_completion_is_logged_with_video_id_and_without_file_name(client,
     assert done[0].fields["video_ids"] == [video_id]
     assert "ms" in done[0].fields
     assert not any("secret-name" in json.dumps(getattr(r, "fields", {})) + r.getMessage() for r in caplog.records)
+
+
+def test_webm_duration_is_video_length_even_when_audio_is_longer(client, tmp_path):
+    import subprocess
+    video = tmp_path / "a.webm"
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:r=30:d=1", "-f", "lavfi",
+         "-i", "sine=d=2", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-c:a", "libopus", str(video)],
+        check=True,
+    )
+
+    response = _upload(client, video)
+
+    assert response.status_code == 201
+    assert abs(response.json()["duration_seconds"] - 1.0) <= 0.05
+
+
+def test_malformed_request_body_gets_common_error_shape(client):
+    response = client.post("/api/merges", json={"ids": []})
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {"code": "invalid_request", "message": "リクエストの形式が正しくありません"}}

@@ -8,9 +8,11 @@ SETTINGS = Settings()
 NOT_A_VIDEO = ("not_a_video", "動画として読み込めませんでした")
 
 
-def _info(width=1920, height=1080, duration=2.0, has_video=True, formats=("mov", "mp4", "m4a", "3gp", "3g2", "mj2")):
+def _info(width=1920, height=1080, duration=2.0, has_video=True, formats=("mov", "mp4", "m4a", "3gp", "3g2", "mj2"),
+          fps_num=30):
     return VideoInfo(format_names=formats, has_video=has_video, duration_seconds=duration, width=width,
-                     height=height, fps_num=30, fps_den=1, has_audio=True)
+                     height=height, fps_num=fps_num, fps_den=1, has_audio=True, video_stream_index=0,
+                     audio_stream_index=1)
 
 
 def _result(info):
@@ -63,3 +65,14 @@ def test_limits_come_from_settings():
 
     assert validate_video_info(_info(640, 360), small) is None
     assert validate_video_info(_info(641, 360), small).message == "解像度 641x360 は上限 640x360 を超えています"
+
+
+@pytest.mark.parametrize("duration", [float("nan"), float("inf")])
+def test_non_finite_duration_is_rejected(duration):
+    assert _result(_info(duration=duration)) == NOT_A_VIDEO
+
+
+def test_zero_frame_rate_or_zero_size_is_rejected():
+    assert _result(_info(fps_num=0)) == NOT_A_VIDEO
+    assert _result(_info(width=0, height=360)) == NOT_A_VIDEO
+    assert _result(_info(width=640, height=0)) == NOT_A_VIDEO

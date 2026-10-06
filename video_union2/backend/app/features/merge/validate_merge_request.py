@@ -18,14 +18,7 @@ class MergeRequestFailure:
 def validate_merge_request(
     sources: list[MergeSource], *, free_bytes: int, settings: Settings
 ) -> MergeRequestFailure | None:
-    """本数・重複・長さの合計・空き容量を確かめ、結合できないときは理由を返す。"""
-    if len(sources) < _MIN_VIDEOS:
-        return MergeRequestFailure(422, "too_few_videos", "結合するには2本以上の動画が必要です")
-    if len(sources) > settings.max_videos:
-        return MergeRequestFailure(422, "too_many_videos", f"一度に結合できるのは{settings.max_videos}本までです")
-    if len({s.video_id for s in sources}) != len(sources):
-        return MergeRequestFailure(422, "duplicate_video", "同じ動画が2回指定されています")
-
+    """長さの合計と空き容量を確かめ、結合できないときは理由を返す(本数と重複は validate_video_ids で確かめる)。"""
     # 浮動小数の誤差で境界を誤らないよう、ミリ秒に丸めて比べる
     total = round(sum(s.duration_seconds for s in sources), 3)
     limit = settings.max_total_seconds
@@ -37,4 +30,15 @@ def validate_merge_request(
 
     if free_bytes < sum(s.size_bytes for s in sources) * _STORAGE_FACTOR:
         return MergeRequestFailure(507, "insufficient_storage", "保存先の空き容量が足りません")
+    return None
+
+
+def validate_video_ids(video_ids: list[str], settings: Settings) -> MergeRequestFailure | None:
+    """メタ情報を読む前に、ID の本数と重複を確かめる。"""
+    if len(video_ids) < _MIN_VIDEOS:
+        return MergeRequestFailure(422, "too_few_videos", "結合するには2本以上の動画が必要です")
+    if len(video_ids) > settings.max_videos:
+        return MergeRequestFailure(422, "too_many_videos", f"一度に結合できるのは{settings.max_videos}本までです")
+    if len(set(video_ids)) != len(video_ids):
+        return MergeRequestFailure(422, "duplicate_video", "同じ動画が2回指定されています")
     return None

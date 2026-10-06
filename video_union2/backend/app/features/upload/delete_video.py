@@ -3,7 +3,6 @@ from app.lib.disk_storage import DiskStorage, InvalidIdError
 from app.lib.errors import AppError
 from app.lib.logger import log_error
 
-_NOT_FOUND = AppError(404, "video_not_found", "指定された動画が見つかりません")
 
 
 def delete_video(video_id: str, storage: DiskStorage) -> None:
@@ -12,12 +11,16 @@ def delete_video(video_id: str, storage: DiskStorage) -> None:
         video = storage.upload_video_path(video_id)
         metadata = storage.upload_metadata_path(video_id)
     except InvalidIdError as e:
-        raise _NOT_FOUND from e
+        raise _not_found() from e
     if not video.exists() and not metadata.exists():
-        raise _NOT_FOUND
+        raise _not_found()
     try:
         video.unlink(missing_ok=True)
         delete_metadata(metadata)
     except OSError as e:
         log_error("upload.delete_video", "動画の削除に失敗しました", err=e, video_ids=[video_id])
         raise
+
+
+def _not_found() -> AppError:
+    return AppError(404, "video_not_found", "指定された動画が見つかりません")

@@ -14,6 +14,8 @@ class FakeXhr {
   responseText = "";
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
   upload: { onprogress: ((event: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = {
     onprogress: null,
   };
@@ -121,5 +123,42 @@ test("通信そのものが失敗したときは、接続できなかったこ�
     status: 0,
     code: "network_error",
     message: "サーバーに接続できませんでした",
+  });
+});
+
+test("201 でも本文が JSON として読めないときは、アップロード失敗の ApiError で失敗する", async () => {
+  const result = uploadVideo(new File(["data"], "a.mp4"), () => {});
+
+  lastXhr().respond(201, "<html>not json</html>");
+
+  await expect(result).rejects.toBeInstanceOf(ApiError);
+  await expect(result).rejects.toMatchObject({
+    status: 201,
+    code: "invalid_response",
+    message: "アップロードに失敗しました",
+  });
+});
+
+test("送信が中断(abort)されたときは、ApiError で失敗する", async () => {
+  const result = uploadVideo(new File(["data"], "a.mp4"), () => {});
+
+  lastXhr().onabort?.();
+
+  await expect(result).rejects.toMatchObject({
+    status: 0,
+    code: "aborted",
+    message: "アップロードに失敗しました",
+  });
+});
+
+test("送信がタイムアウトしたときは、ApiError で失敗する", async () => {
+  const result = uploadVideo(new File(["data"], "a.mp4"), () => {});
+
+  lastXhr().ontimeout?.();
+
+  await expect(result).rejects.toMatchObject({
+    status: 0,
+    code: "timeout",
+    message: "アップロードに失敗しました",
   });
 });

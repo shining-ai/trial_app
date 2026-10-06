@@ -1,5 +1,7 @@
 import type { MergeJobResponse } from "./types";
 
+const FAILED_MESSAGE = "結合に失敗しました";
+
 export function MergeProgress({ job }: { job: MergeJobResponse | null }) {
   if (job?.status === "running") {
     return (
@@ -10,7 +12,7 @@ export function MergeProgress({ job }: { job: MergeJobResponse | null }) {
     );
   }
   if (job?.status === "failed") {
-    return <p role="alert">{job.error?.message}</p>;
+    return <p role="alert">{job.error?.message ?? FAILED_MESSAGE}</p>;
   }
   return null;
 }

@@ -4,9 +4,9 @@ import shutil
 from app.features.merge.load_merge_sources import load_merge_sources
 from app.features.merge.merge_job_store import MergeJob, MergeJobStore
 from app.features.merge.run_merge_job import run_merge_job
-from app.features.merge.validate_merge_request import validate_merge_request
+from app.features.merge.validate_merge_request import validate_merge_request, validate_video_ids
 from app.lib.config import Settings
-from app.lib.disk_space import free_bytes
+from app.lib.disk_space import directory_size, free_bytes
 from app.lib.disk_storage import DiskStorage
 from app.lib.errors import AppError
 from app.lib.logger import log_error
@@ -14,8 +14,13 @@ from app.lib.logger import log_error
 
 def start_merge(video_ids: list[str], settings: Settings, storage: DiskStorage, store: MergeJobStore) -> MergeJob:
     """確認 → 前回の結果の削除 → ジョブの登録と開始を行う。"""
+    failure = validate_video_ids(video_ids, settings)
+    if failure is not None:
+        raise AppError(failure.status, failure.code, failure.message)
     sources = load_merge_sources(video_ids, storage)
-    failure = validate_merge_request(sources, free_bytes=free_bytes(storage.merges_dir()), settings=settings)
+    # 前回の結果は開始時に消すため、その分も使える容量に数える
+    available = free_bytes(storage.merges_dir()) + directory_size(storage.merges_dir())
+    failure = validate_merge_request(sources, free_bytes=available, settings=settings)
     if failure is not None:
         raise AppError(failure.status, failure.code, failure.message)
     if store.has_running():

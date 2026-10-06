@@ -15,8 +15,10 @@ async def post_video(request: Request) -> VideoResponse:
     raw_name = request.headers.get("x-file-name")
     if not raw_name:
         raise AppError(422, "file_name_required", "ファイル名がありません")
+    raw_length = request.headers.get("content-length")
+    declared_size = int(raw_length) if raw_length and raw_length.isdigit() else None
     return await upload_video(
-        request.stream(), unquote(raw_name), request.app.state.settings, request.app.state.storage
+        request.stream(), unquote(raw_name), declared_size, request.app.state.settings, request.app.state.storage
     )
 
 

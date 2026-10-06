@@ -1,6 +1,7 @@
 import time
 from collections.abc import AsyncIterator
 
+from app.features.upload.check_upload_size import check_upload_size
 from app.features.upload.parse_probe_output import parse_probe_output
 from app.features.upload.probe_video import probe_video
 from app.features.upload.receive_upload import receive_upload
@@ -8,6 +9,7 @@ from app.features.upload.schemas import VideoResponse
 from app.features.upload.validate_video_info import validate_video_info
 from app.features.upload.video_metadata_store import write_metadata
 from app.lib.config import Settings
+from app.lib.disk_space import free_bytes
 from app.lib.disk_storage import DiskStorage
 from app.lib.errors import AppError
 from app.lib.generate_id import generate_id
@@ -18,7 +20,7 @@ _NAME = "upload.upload_video"
 
 
 async def upload_video(
-    chunks: AsyncIterator[bytes], file_name: str, settings: Settings, storage: DiskStorage
+    chunks: AsyncIterator[bytes], file_name: str, declared_size: int | None, settings: Settings, storage: DiskStorage
 ) -> VideoResponse:
     """受信 → ffprobe → 判定 → 本保存 → メタ情報の書き込みを行う。失敗したら作ったファイルを消す。"""
     started = time.monotonic()
@@ -26,7 +28,13 @@ async def upload_video(
     temp = storage.upload_temp_path(video_id)
     video = storage.upload_video_path(video_id)
     metadata = storage.upload_metadata_path(video_id)
+    metadata_temp = storage.upload_metadata_temp_path(video_id)
     try:
+        failure = check_upload_size(
+            declared_size, max_bytes=settings.max_upload_bytes, free_bytes=free_bytes(storage.uploads_dir())
+        )
+        if failure is not None:
+            raise AppError(failure.status, failure.code, failure.message)
         size = await receive_upload(chunks, temp, settings.max_upload_bytes)
         try:
             info = parse_probe_output(await probe_video(temp, settings.ffprobe_timeout_seconds))
@@ -36,11 +44,11 @@ async def upload_video(
         if failure is not None:
             raise AppError(422, failure.code, failure.message)
         temp.replace(video)
-        write_metadata(metadata, video_id=video_id, file_name=file_name, size_bytes=size, info=info)
+        write_metadata(metadata, metadata_temp, video_id=video_id, file_name=file_name, size_bytes=size, info=info)
     except BaseException as e:
         log_error(_NAME, "アップロードに失敗しました", err=e, video_ids=[video_id],
                   ms=round((time.monotonic() - started) * 1000))
-        _remove_quietly_with_note(e, video_id, temp, video, metadata)
+        _remove_quietly_with_note(e, video_id, temp, video, metadata_temp, metadata)
         raise
 
     log_info(_NAME, "アップロードが完了しました", video_ids=[video_id], size_bytes=size,

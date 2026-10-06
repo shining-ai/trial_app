@@ -53,8 +53,26 @@ test("「削除」で deleteVideo がその項目のIDで呼ばれ、成功し�
   expect(result.current.deleteError).toBeNull();
 });
 
-test("deleteVideo が失敗したら一覧に残り、サーバーの message を返し、deleteError に持つ", async () => {
+test("deleteVideo が404(video_not_found)なら、サーバーにはもうないので、成功と同じく一覧から外す", async () => {
   vi.mocked(deleteVideo).mockRejectedValue(new ApiError(404, "video_not_found", "指定された動画が見つかりません"));
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 20));
+  });
+
+  let message: string | null = "unset";
+  await act(async () => {
+    message = await result.current.removeItem("a");
+  });
+
+  expect(message).toBeNull();
+  expect(result.current.videoIds).toEqual(["b"]);
+  expect(result.current.deleteError).toBeNull();
+});
+
+test("deleteVideo が404以外のApiErrorで失敗したら一覧に残り、サーバーの message を返し、deleteError に持つ", async () => {
+  vi.mocked(deleteVideo).mockRejectedValue(new ApiError(409, "merge_in_progress", "結合中の動画は削除できません"));
   const { result } = renderHook(() => useMergeQueue());
   act(() => {
     result.current.addItem(video("a", 10));
@@ -65,8 +83,8 @@ test("deleteVideo が失敗したら一覧に残り、サーバーの message �
     message = await result.current.removeItem("a");
   });
 
-  expect(message).toBe("指定された動画が見つかりません");
-  expect(result.current.deleteError).toBe("指定された動画が見つかりません");
+  expect(message).toBe("結合中の動画は削除できません");
+  expect(result.current.deleteError).toBe("結合中の動画は削除できません");
   expect(result.current.videoIds).toEqual(["a"]);
 });
 
@@ -87,7 +105,7 @@ test("ApiError でない失敗は固定の文言を返し、一覧に残す", as
 });
 
 test("削除が成功すると、前回の deleteError は消える", async () => {
-  vi.mocked(deleteVideo).mockRejectedValueOnce(new ApiError(404, "video_not_found", "指定された動画が見つかりません"));
+  vi.mocked(deleteVideo).mockRejectedValueOnce(new ApiError(500, "unknown", "サーバーとの通信に失敗しました"));
   const { result } = renderHook(() => useMergeQueue());
   act(() => {
     result.current.addItem(video("a", 10));

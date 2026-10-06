@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from app.features.upload.video_info import VideoInfo
@@ -18,7 +19,9 @@ def validate_video_info(info: VideoInfo, settings: Settings) -> ValidationFailur
     """動画として受け付けられるかを判定し、受け付けられないときは理由を返す。"""
     if not is_allowed_format(info.format_names) or not info.has_video:
         return _NOT_A_VIDEO
-    if info.duration_seconds is None or info.duration_seconds <= 0:
+    if info.duration_seconds is None or not math.isfinite(info.duration_seconds) or info.duration_seconds <= 0:
+        return _NOT_A_VIDEO
+    if info.fps_num <= 0 or info.fps_den <= 0 or info.width <= 0 or info.height <= 0:
         return _NOT_A_VIDEO
 
     long_side, short_side = max(info.width, info.height), min(info.width, info.height)

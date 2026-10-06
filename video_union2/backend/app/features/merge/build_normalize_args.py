@@ -22,13 +22,14 @@ def build_normalize_args(
     """
     w, h = output.width, output.height
     video_chain = (
-        f"[0:v:0]pad={w}:{h}:({w}-iw)/2:({h}-ih)/2:color=black,"
+        f"[0:{source.video_stream_index}]pad={w}:{h}:({w}-iw)/2:({h}-ih)/2:color=black,"
         f"setsar=1,fps={output.fps_num}/{output.fps_den},format=yuv420p[v]"
     )
-    audio_input = "[0:a:0]" if source.has_audio else "[1:a:0]"
+    audio_input = f"[0:{source.audio_stream_index}]" if source.has_audio else "[1:a:0]"
     audio_chain = f"{audio_input}aresample=48000,aformat=channel_layouts=stereo,apad[a]"
 
-    args = ["ffmpeg", "-y", "-nostdin", "-v", "error", *input_restriction_args(), "-i", str(input_path)]
+    # -xerror: 途中で切れた・壊れた入力を、短い出力のまま成功にしない
+    args = ["ffmpeg", "-y", "-nostdin", "-v", "error", "-xerror", *input_restriction_args(), "-i", str(input_path)]
     if not source.has_audio:
         args += ["-f", "lavfi", "-i", _SILENT_AUDIO]
     args += [

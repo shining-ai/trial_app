@@ -1,5 +1,5 @@
 from app.features.merge.merge_source import MergeSource
-from app.features.merge.validate_merge_request import validate_merge_request
+from app.features.merge.validate_merge_request import validate_merge_request, validate_video_ids
 from app.lib.config import Settings
 
 SETTINGS = Settings()
@@ -8,12 +8,23 @@ PLENTY = 10**15
 
 def _src(i, duration=1.0, size=100):
     return MergeSource(video_id=f"{i:032x}", file_name=f"{i}.mp4", size_bytes=size, duration_seconds=duration,
-                       width=640, height=360, fps_num=30, fps_den=1, has_audio=True)
+                       width=640, height=360, fps_num=30, fps_den=1, has_audio=True, video_stream_index=0, audio_stream_index=1)
 
 
 def _check(sources, free=PLENTY, settings=SETTINGS):
-    failure = validate_merge_request(sources, free_bytes=free, settings=settings)
+    failure = validate_video_ids([s.video_id for s in sources], settings) or validate_merge_request(
+        sources, free_bytes=free, settings=settings)
     return None if failure is None else (failure.status, failure.code, failure.message)
+
+
+def test_ids_are_checked_for_count_and_duplicates_before_reading_anything():
+    ids = ["a" * 32] * 200_000
+
+    failure = validate_video_ids(ids, SETTINGS)
+
+    assert (failure.status, failure.code) == (422, "too_many_videos")
+    assert validate_video_ids(["a" * 32, "a" * 32], SETTINGS).code == "duplicate_video"
+    assert validate_video_ids(["a" * 32, "b" * 32], SETTINGS) is None
 
 
 def test_two_videos_are_allowed_and_fewer_are_rejected():

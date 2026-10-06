@@ -6,7 +6,9 @@ from app.features.upload.video_info import VideoInfo
 METADATA_VERSION = 1
 
 
-def write_metadata(path: Path, *, video_id: str, file_name: str, size_bytes: int, info: VideoInfo) -> None:
+def write_metadata(
+    path: Path, temp_path: Path, *, video_id: str, file_name: str, size_bytes: int, info: VideoInfo
+) -> None:
     """メタ情報ファイルを書く(書きかけのファイルが読まれないよう、別名で書いてから置き換える)。"""
     data = {
         "version": METADATA_VERSION,
@@ -19,10 +21,11 @@ def write_metadata(path: Path, *, video_id: str, file_name: str, size_bytes: int
         "fps_num": info.fps_num,
         "fps_den": info.fps_den,
         "has_audio": info.has_audio,
+        "video_stream_index": info.video_stream_index,
+        "audio_stream_index": info.audio_stream_index,
     }
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False))
-    tmp.replace(path)
+    temp_path.write_text(json.dumps(data, ensure_ascii=False))
+    temp_path.replace(path)
 
 
 def delete_metadata(path: Path) -> None:

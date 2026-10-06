@@ -127,7 +127,7 @@ describe("useMergeJob", () => {
     expect(result.current.rejectMessage).toBe("結合を始められませんでした");
   });
 
-  test("問い合わせが失敗したら、その message で失敗にして止まる", async () => {
+  test("問い合わせが404(ジョブがない)なら、サーバーの message で失敗にして止まる", async () => {
     vi.mocked(requestMerge).mockResolvedValue(job("running", 0));
     vi.mocked(fetchMergeJob).mockRejectedValue(new ApiError(404, "job_not_found", "結合が見つかりません"));
     const { result } = renderHook(() => useMergeJob());
@@ -142,6 +142,51 @@ describe("useMergeJob", () => {
     expect(result.current.job?.status).toBe("failed");
     expect(result.current.job?.error?.message).toBe("結合が見つかりません");
     expect(result.current.isMerging).toBe(false);
+  });
+
+  test("問い合わせが5xxで失敗しても、ジョブは failed にならず、1秒後に問い合わせを続ける", async () => {
+    vi.mocked(requestMerge).mockResolvedValue(job("running", 0));
+    vi.mocked(fetchMergeJob)
+      .mockRejectedValueOnce(new ApiError(503, "unknown", "サーバーとの通信に失敗しました"))
+      .mockResolvedValueOnce(job("succeeded", 1));
+    const { result } = renderHook(() => useMergeJob());
+    await act(async () => {
+      await result.current.start(["a", "b"]);
+    });
+
+    await advance(1000);
+    expect(fetchMergeJob).toHaveBeenCalledTimes(1);
+    expect(result.current.job).toEqual(job("running", 0));
+    expect(result.current.isMerging).toBe(true);
+
+    await advance(999);
+    expect(fetchMergeJob).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(fetchMergeJob).toHaveBeenCalledTimes(2);
+    expect(result.current.job).toEqual(job("succeeded", 1));
+    expect(result.current.isMerging).toBe(false);
+  });
+
+  test("通信の失敗(例外)でも、ジョブは failed にならず、1秒後に問い合わせを続ける", async () => {
+    vi.mocked(requestMerge).mockResolvedValue(job("running", 0));
+    vi.mocked(fetchMergeJob)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(job("running", 0.7));
+    const { result } = renderHook(() => useMergeJob());
+    await act(async () => {
+      await result.current.start(["a", "b"]);
+    });
+
+    await advance(1000);
+    await advance(1000);
+    expect(fetchMergeJob).toHaveBeenCalledTimes(2);
+    expect(result.current.job).toEqual(job("running", 0));
+    expect(result.current.isMerging).toBe(true);
+
+    await advance(1000);
+    expect(fetchMergeJob).toHaveBeenCalledTimes(3);
+    expect(result.current.job).toEqual(job("running", 0.7));
   });
 
   test("次の結合を始めると、前回の断られたメッセージは消え、ジョブは新しいものに替わる", async () => {

@@ -22,6 +22,11 @@ export function useMergeQueue() {
     try {
       await deleteVideo(id);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.code === "video_not_found") {
+        setItems((current) => current.filter((item) => item.id !== id));
+        setDeleteError(null);
+        return null;
+      }
       const message = error instanceof ApiError ? error.message : DELETE_FAILED_MESSAGE;
       setDeleteError(message);
       return message;

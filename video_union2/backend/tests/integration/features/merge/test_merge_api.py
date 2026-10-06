@@ -268,6 +268,28 @@ def test_broken_video_fails_the_job_and_leaves_no_files(client, settings, tmp_pa
     assert type(task.exception()).__name__ == "ProcessFailedError"
 
 
+def test_video_truncated_in_the_middle_fails_the_job_and_leaves_no_files(client, settings, tmp_path):
+    good = upload_id(client, make_video(tmp_path / "good.mp4"))
+    source = tmp_path / "cut.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=3", "-f", "lavfi",
+         "-i", "sine=d=3", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart",
+         str(source)],
+        check=True,
+    )
+    cut = tmp_path / "half.mp4"
+    cut.write_bytes(source.read_bytes()[: source.stat().st_size // 2])
+    truncated = upload_id(client, cut, file_name="half.mp4")
+
+    job = wait_for_job(client, _merge(client, [good, truncated]).json()["id"])
+
+    assert job["status"] == "failed"
+    assert job["error"]["message"] == "2番目の動画『half.mp4』の変換に失敗しました"
+    job_dir = settings.storage_dir / "merges" / job["id"]
+    leftovers = sorted(p.name for p in job_dir.iterdir()) if job_dir.exists() else []
+    assert leftovers == []
+
+
 def test_job_logs_carry_request_id_of_the_post(client, tmp_path, caplog):
     caplog.set_level(logging.INFO)
     ids = [upload_id(client, make_video(tmp_path / f"{i}.mp4")) for i in range(2)]

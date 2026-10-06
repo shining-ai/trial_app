@@ -37,6 +37,12 @@ test("失敗したらサーバーの message を表示し、進み具合は出�
   expect(screen.queryByText("30%")).toBeNull();
 });
 
+test("失敗なのに error が null のときは、「結合に失敗しました」を表示する", () => {
+  render(<MergeProgress job={job({ status: "failed", progress: 0.3, error: null })} />);
+
+  expect(screen.getByRole("alert").textContent).toBe("結合に失敗しました");
+});
+
 test("ジョブがないとき・完了したときは何も表示しない", () => {
   const { container, rerender } = render(<MergeProgress job={null} />);
   expect(container.textContent).toBe("");
