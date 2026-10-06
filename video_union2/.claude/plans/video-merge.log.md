@@ -42,3 +42,30 @@
 ### その他の判断
 
 - **テスト用の動画以外のフィクスチャ:** プランでは静止画・HLS・ffconcat も `fixtures/` に置く予定だったが、静止画は FFmpeg で作れ、HLS・ffconcat は参照先のパスがテストごとに変わるため、テストの中で作ることにした(testing.md「作れないものだけを fixtures に置く」)。`fixtures/` には `not_a_video.mp4` だけを置く
+
+## Step 4 実装
+
+### 進め方の判断
+
+- **Step 4 と Step 5 の重なり:** 指示では Step 4 で実装し、Step 5 でテストを先に失敗させてから実装を直す順になっている。一方、`.claude/rules/testing.md` と tdd スキルは「新しいテストは、先に失敗(Red)を確認してから実装する」と定めている。実装を先に書くと Red を確かめられなくなるため、Step 4 の中でモジュールごとにテストを先に書き、Red を確かめてから実装した。Step 5 では、プランの新規テストケースがすべてテストコードになっているかの突き合わせと、全テストの実行を行う
+- **1件ずつではなくモジュールごと:** tdd スキルは1件ずつ Red → Green を回す手順だが、テストの件数が多いため、モジュールごとにテストをまとめて書き、関数の外形だけを作った状態で全件が「未実装の振る舞い」で失敗することを確かめてから実装した。import エラーや構文エラーを Red に数えないよう、外形は `NotImplementedError` を送出する形にした
+- **担当の割り当て:** frontend(プラン1のタスク7・8、プラン3のタスク1〜3)は、プランどおり Sonnet のサブエージェント1体に任せ、backend と並行して進めた。触ってよい範囲を `frontend/` に限り、コミットはメインが差分とテストを確かめてから行った。backend と E2E は、FFmpeg・ジョブ・セキュリティの判断が多く、ファイル間の整合を保つため、Haiku・Sonnet に割り当てていたタスク(テスト用の補助関数、掃除、進み具合、ダウンロード、E2E の土台)もメインで行った
+- **開発中のテストの実行:** backend のソースはコンテナにマウントされているため、開発中は `--build` なしで実行し、最後の確認(Step 5)で `--build` 付きのコマンドを使った
+- **FFmpeg の機能の確認:** 実装前に、コンテナの FFmpeg 7.1 で `-protocol_whitelist`・`-format_whitelist`・`-display_rotation`・VP9・MPEG-4 Part 2 が使えること、ffconcat が許可リストで拒否されることを確かめた
+
+### プランにない変更
+
+[video-merge.md](video-merge.md) の「実装で追加・変更した点」(I1〜I12)に追記した。I1(許可リストを lib に置く)は実装の途中で判断し、その場でプランの記述と照らして決めた。それ以外は、実装しながら気づいた細部で、プランへの追記は実装の後になった(指示の「追記してから実装」の順を守れなかった点として記録する)。
+
+### frontend(Sonnet のサブエージェント)
+
+- 全ファイルとも、関数の外形だけを作って中立な値を返す状態で実行し、assert の不一致で失敗(Red)することを確かめてから実装した(`apiClient`・`formatDuration`・`checkFileSize`・`limitSelection`・`pickNextUploads`・`uploadVideo`・`UploadList`・`UploadForm`・`useUploadQueue`・`moveItem`・`checkMergeable`・`formatExcess`・`VideoOrderList`・`useMergeQueue`・`MergeSummary`・`MergeButton`・`MergeProgress`・`useMergeJob`・`DownloadLink`・`deleteVideo`・`requestMerge`・`fetchMergeJob`・`App`)
+- **最初から通ったテスト:** 外形だけの関数が返す中立な値(false、空配列、null、何も描画しない)とたまたま一致した否定側のケース(`apiFetch` の204、`checkFileSize` の4294967297の拒否、`pickNextUploads` の送信中2本、`remainingSlots` の100本、`moveItem` が元の配列を変えない、描画の「出ない」系、`useMergeJob` のアンマウント後)。同じファイルの肯定側のケースが Red だったため、実装済み・assert が弱いのどちらでもないと判定。アンマウントのテストだけは、実装の後片付けを外すと失敗することを確かめた
+- **プランにない判断(サブエージェントが行い、メインが確認して採用):**
+  - `formatDuration` は upload の `UploadList` でも使うため、プランの「2つ目の利用が出たら lib に移す」に従い `src/lib/formatDuration.ts` に置いた
+  - プランにないテストを足した: `apiClient`、`uploadVideo`(偽の XHR)、`deleteVideo`・`requestMerge`・`fetchMergeJob`(fetch の差し替え)、`App` の配線。差し替えは通信の制御に限る
+  - 残り枠の計算 `remainingSlots` を `limitSelection.ts` に同居させた
+  - 4GB 超のファイルは枠を使わずにその場で失敗の項目にする
+  - サーバーの message が得られないとき(通信の失敗、JSON でない応答)だけ使う画面側の文言を決めた(「サーバーに接続できませんでした」など)
+  - 状態の問い合わせが失敗したら、そのジョブを失敗として止める。結合が断られたときは前回のジョブ(ダウンロードリンク)を残す
+- **残った論点:** 超過の文言が `MergeSummary` と `MergeButton`(押せない理由)の両方に出る。プランの画面構成どおりなので変えない。E2E では表示箇所を限定して選ぶ

@@ -73,3 +73,22 @@
   - **Haiku のサブエージェント**(`general-purpose`、`model: haiku`): テスト用動画を作る補助関数など、入出力が決まった定型作業
   - **レビュー**: `design-reviewer`(プランとの照合)、`edge-case-reviewer`(境界・異常系)、`security-reviewer`(セキュリティ。Bash を持たないため差分を渡す)を並列に実行する
 - P0・P1 を直したら、再レビューに戻す
+
+## 実装で追加・変更した点(Step 4)
+
+実装中に、プランにない変更が必要になったもの。経緯と理由は [video-merge.log.md](video-merge.log.md) に記録する。
+
+| # | 変更 | 理由 |
+|---|---|---|
+| I1 | 入力の許可リストと制限の引数を `backend/app/lib/media_input_policy.py` に置き、upload の ffprobe と merge の ffmpeg の両方から使う | 同じ許可リストを2つの機能で持つと食い違う。FFmpeg に渡す入力の制限は特定の機能に属さない基盤(architecture.md の問い2)と判断した |
+| I2 | `disk_storage.py` は関数ではなく `DiskStorage` クラスのメソッドにし、`merge_parts_dir` を足した | 保存先のルートを設定から受け取るため。中間ファイルのフォルダを `build_concat_list` の確認と後片付けで使う |
+| I3 | 応答のヘッダーに `X-Request-ID` を付ける | 結合ジョブのログの request_id を、`POST /api/merges` と突き合わせて確かめるため(R6 のテスト) |
+| I4 | `MergeRequest` では ID の形式を制約せず、`load_merge_sources` で形式と存在を確かめて `video_not_found`(422)にする | 形式の誤りも存在しない ID も、利用者には同じ「指定された動画が見つかりません」で返すため。リクエストの形の誤り(`video_ids` がないなど)は共通の形の `invalid_request`(422)にする |
+| I5 | `load_merge_sources` は、メタ情報に加えて動画ファイルがあることも確かめる | メタ情報だけ残った状態で結合を始めないため |
+| I6 | ffprobe 自体が失敗したファイル(許可リストにない形式など)は `not_a_video`(422)にする | ffprobe が読めないファイルは動画として扱えないため |
+| I7 | 映像ストリームのうち、カバー画像(`attached_pic`)は「最初の映像」として扱わない | MP4・MKV のカバー画像は静止画で、これを映像として使うと結合が壊れるため |
+| I8 | `avg_frame_rate` が `0/0` のときは `r_frame_rate` を使う | 一部の動画で平均フレームレートが取れないため |
+| I9 | 結合ジョブが失敗したときは、元の例外をそのまま再送出し、失敗した番号はジョブの中で数える | R6「元の例外を再送出」を守るため(番号を運ぶために例外を包まない) |
+| I10 | 起動時の掃除は、`merges/` の古いジョブのフォルダも中身ごと消す | 結合結果も24時間で消す対象(FR-015)のため |
+| I11 | frontend の `formatDuration` は `frontend/src/lib/` に置いた | upload の `UploadList` でも使い、2つ目の利用が出たため(プランの判断基準どおり) |
+| I12 | E2E は `workers: 1` で順に実行し、並び順を確かめるテストは1本ずつアップロードする | 結合は同時に1件しか実行できない(409)。アップロードは2本ずつ並行し、完了した順にリストへ入るため |
