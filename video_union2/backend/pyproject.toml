@@ -17,4 +17,4 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 # コンテナはrootで動き、backend/ はホストからマウントしているため、キャッシュを書き出さない
-addopts = "-p no:cacheprovider"
+addopts = "-p no:cacheprovider --import-mode=importlib"
