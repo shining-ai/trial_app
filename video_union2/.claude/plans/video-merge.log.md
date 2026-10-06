@@ -188,3 +188,8 @@ $ docker compose --profile e2e down
 - 長さの許容誤差: I23 に理由を書いた
 - 再生リストのテスト: `file:` の参照先が開かれないことは、ffprobe の出力(ffconcat の「not on whitelist」)と、HTTP の参照先に接続しないことで確かめている。同じ意図を満たすと判断した
 - 4GB の転送: アプリを起動し、スパースファイルを curl で送って確かめた。4GB ちょうどは最後まで受け取られて422(中身がゼロのため動画でない)、4GB+1バイトは `Content-Length` ありなら受信前に413、chunked なら受信の途中で413。どの場合も `.part` は残らなかった
+
+### ラウンド2(途中)
+
+- security-reviewer: P0・P1 なし。P2 が6件(chunked 送信・同時アップロードでは空き容量の確認が効かない、`rotate` タグの nan・inf で500、途中で解像度が変わる H.264、コーデックの許可リストがない、`POST /api/merges` の本文の大きさに上限がない、ファイル名の制御文字)。観点の外で、`compose.yaml` のポート `8000:8000` が全インターフェースで待ち受ける点の指摘あり
+- design-reviewer・edge-case-reviewer: 利用上限に達したため、結果を受け取る前に作業を止めた(未記録)
