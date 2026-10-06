@@ -74,7 +74,7 @@ def test_first_video_stream_is_used_when_there_are_two():
     assert (info.width, info.height) == (640, 360)
 
 
-def test_first_audio_stream_is_used_when_there_are_two():
+def test_two_audio_streams_still_mean_the_video_has_audio():
     second = {"codec_type": "audio", "sample_rate": "44100", "channels": 1}
 
     info = parse_probe_output(_probe([_video(), AUDIO, second]))

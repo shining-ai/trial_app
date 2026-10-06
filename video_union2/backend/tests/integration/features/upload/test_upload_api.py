@@ -1,6 +1,7 @@
 import json
 import logging
-import shutil
+import socket
+import threading
 from urllib.parse import quote
 
 import pytest
@@ -113,6 +114,40 @@ def test_hls_playlist_is_rejected_and_nothing_is_left(client, settings, tmp_path
 
     assert response.status_code == 422
     assert response.json() == NOT_A_VIDEO
+    assert _stored_files(settings) == []
+
+
+def test_playlist_referring_to_a_url_does_not_make_the_server_connect(client, settings):
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    listener.settimeout(0.2)
+    port = listener.getsockname()[1]
+    connections = []
+
+    def accept():
+        try:
+            conn, _ = listener.accept()
+            connections.append(conn)
+        except OSError:
+            pass
+
+    watcher = threading.Thread(target=accept)
+    watcher.start()
+    payloads = [
+        f"#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nhttp://127.0.0.1:{port}/a.ts\n#EXT-X-ENDLIST\n",
+        f"ffconcat version 1.0\nfile http://127.0.0.1:{port}/a.mp4\n",
+    ]
+
+    responses = [
+        client.post("/api/videos", content=p.encode(), headers={"Content-Type": "application/octet-stream", "X-File-Name": "x.mp4"})
+        for p in payloads
+    ]
+    watcher.join()
+    listener.close()
+
+    assert [r.status_code for r in responses] == [422, 422]
+    assert connections == []
     assert _stored_files(settings) == []
 
 

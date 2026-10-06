@@ -200,6 +200,36 @@ def test_invalid_requests_are_rejected_with_422(client, tmp_path, make_ids, code
     assert response.json()["error"]["code"] == code
 
 
+def test_ids_pointing_outside_uploads_are_not_read(client, settings, tmp_path):
+    good = upload_id(client, make_video(tmp_path / "a.mp4"))
+    real = settings.storage_dir / "uploads" / f"{good}.json"
+    # 保存先の外(uploads の1つ上)に、本物と同じ形のメタ情報と動画を置く
+    outside = settings.storage_dir / "evil"
+    outside.with_suffix(".json").write_text(real.read_text())
+    outside.with_suffix(".bin").write_bytes((settings.storage_dir / "uploads" / f"{good}.bin").read_bytes())
+
+    response = _merge(client, [good, "../evil"])
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "video_not_found"
+
+
+def test_first_audio_track_is_used_when_there_are_two(client, settings, tmp_path):
+    two_tracks = tmp_path / "two.mkv"
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=320x180:r=30:d=1",
+         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=1", "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+         "-map", "0:v", "-map", "1:a", "-map", "2:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+         "-shortest", str(two_tracks)],
+        check=True,
+    )
+    ids = [upload_id(client, two_tracks), upload_id(client, make_video(tmp_path / "b.mp4", audio=False))]
+
+    result = _merge_ok(client, settings, ids)
+
+    assert max_volume_db(result, start=0.1, duration=0.8) < -60
+
+
 def test_second_merge_while_running_is_rejected_with_409(client, tmp_path):
     ids = [upload_id(client, make_video(tmp_path / f"{i}.mp4", duration=10.0, color=None, width=640, height=360))
            for i in range(2)]
