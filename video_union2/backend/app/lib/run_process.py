@@ -60,8 +60,13 @@ async def run_process(
             on_stdout_line(pending.decode(errors="replace"))
 
     async def read_stderr():
-        async for raw in process.stderr:
-            stderr_tail.append(raw.decode(errors="replace").rstrip("\n"))
+        pending = b""
+        while chunk := await process.stderr.read(65536):
+            pending += chunk
+            *lines, pending = pending.split(b"\n")
+            stderr_tail.extend(raw.decode(errors="replace") for raw in lines)
+        if pending:
+            stderr_tail.append(pending.decode(errors="replace"))
 
     timed_out = False
     try:

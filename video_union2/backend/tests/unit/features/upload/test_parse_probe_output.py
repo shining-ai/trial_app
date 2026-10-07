@@ -1,3 +1,5 @@
+import pytest
+
 from app.features.upload.parse_probe_output import parse_probe_output
 
 
@@ -126,10 +128,20 @@ def test_matroska_duration_tag_is_used_for_video_length():
     assert info.duration_seconds == 1.5
 
 
-def test_non_integer_rotate_tag_is_accepted():
+@pytest.mark.parametrize("value", ["90", "90.0", "inf", "nan"])
+def test_rotate_tag_is_ignored_because_ffmpeg_rotates_only_by_display_matrix(value):
     stream = _video()
-    stream["tags"] = {"rotate": "90.0"}
+    stream["tags"] = {"rotate": value}
 
     info = parse_probe_output(_probe([stream]))
 
-    assert (info.width, info.height) == (1080, 1920)
+    assert (info.width, info.height) == (1920, 1080)
+
+
+def test_non_finite_display_matrix_rotation_is_treated_as_no_rotation():
+    stream = _video()
+    stream["side_data_list"] = [{"side_data_type": "Display Matrix", "rotation": float("nan")}]
+
+    info = parse_probe_output(_probe([stream]))
+
+    assert (info.width, info.height) == (1920, 1080)

@@ -1,3 +1,5 @@
+import math
+
 from app.features.upload.video_info import VideoInfo
 
 
@@ -34,11 +36,12 @@ def parse_probe_output(probe: dict) -> VideoInfo:
 
 
 def _rotation(stream: dict) -> int:
+    """表示行列(displaymatrix)の回転だけを読む。FFmpeg はタグの rotate では回転しないため使わない。"""
     for side_data in stream.get("side_data_list", []):
         if "rotation" in side_data:
-            return int(round(float(side_data["rotation"])))
-    rotate = _float(stream.get("tags", {}).get("rotate"))
-    return int(round(rotate)) if rotate is not None else 0
+            rotation = _float(side_data["rotation"])
+            return int(round(rotation)) if rotation is not None and math.isfinite(rotation) else 0
+    return 0
 
 
 def _float(value) -> float | None:

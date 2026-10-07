@@ -64,17 +64,18 @@ async def run_merge_job(job: MergeJob, sources: list[MergeSource], settings: Set
         partial.replace(storage.merge_result_path(job.id))
     except BaseException as e:
         failed = sources[current_index - 1] if current_index else None
+        # 記録や後片付けでさらに失敗しても、ジョブが running のまま残らないよう、先に状態を決める
+        job.status = "failed"
+        job.error_code = "merge_failed"
+        job.error_message = (
+            f"{current_index}番目の動画『{failed.file_name}』の変換に失敗しました" if failed else "結合に失敗しました"
+        )
         log_error(
             _NAME, "結合に失敗しました", err=e, video_ids=video_ids,
             failed_index=current_index or None, failed_video_id=failed.video_id if failed else None,
             ms=round((time.monotonic() - started) * 1000),
         )
         _cleanup_after_failure(e, video_ids, parts_dir, list_path, partial)
-        job.status = "failed"
-        job.error_code = "merge_failed"
-        job.error_message = (
-            f"{current_index}番目の動画『{failed.file_name}』の変換に失敗しました" if failed else "結合に失敗しました"
-        )
         raise
 
     job.progress = 1.0

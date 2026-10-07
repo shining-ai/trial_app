@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { deleteVideo } from "../../../../src/features/merge/deleteVideo";
 import type { MergeItem } from "../../../../src/features/merge/types";
+import { checkMergeable } from "../../../../src/features/merge/checkMergeable";
 import { useMergeQueue } from "../../../../src/features/merge/useMergeQueue";
 import { ApiError } from "../../../../src/lib/apiClient";
 
@@ -142,6 +143,10 @@ test("並べ替えたあとの並び順が、結合を始めるときに渡すID
   expect(result.current.videoIds).toEqual(["c", "b", "a"]);
 });
 
+function mergeable(totalSeconds: number, count: number) {
+  return checkMergeable({ count, totalSeconds, isMerging: false }).mergeable;
+}
+
 test("合計1810秒(超過)の状態から20秒の項目を削除すると、合計1790秒になる。追加しても合計が更新される", async () => {
   const { result } = renderHook(() => useMergeQueue());
   act(() => {
@@ -150,14 +155,27 @@ test("合計1810秒(超過)の状態から20秒の項目を削除すると、合
     result.current.addItem(video("c", 20));
   });
   expect(result.current.totalSeconds).toBe(1810);
+  expect(mergeable(result.current.totalSeconds, 3)).toBe(false);
 
   await act(async () => {
     await result.current.removeItem("c");
   });
   expect(result.current.totalSeconds).toBe(1790);
+  expect(mergeable(result.current.totalSeconds, 2)).toBe(true);
 
   act(() => {
     result.current.addItem(video("d", 15));
   });
   expect(result.current.totalSeconds).toBe(1805);
+  expect(mergeable(result.current.totalSeconds, 3)).toBe(false);
+});
+
+test("合計が 1800.0005 秒付近でも、サーバーと同じくミリ秒の整数で足して判定する", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    [421.507158, 429.191406, 949.301936].forEach((seconds, i) => result.current.addItem(video(`v${i}`, seconds)));
+  });
+
+  expect(result.current.totalSeconds).toBe(1800);
+  expect(mergeable(result.current.totalSeconds, 3)).toBe(true);
 });

@@ -285,3 +285,41 @@ def test_malformed_request_body_gets_common_error_shape(client):
 
     assert response.status_code == 422
     assert response.json() == {"error": {"code": "invalid_request", "message": "リクエストの形式が正しくありません"}}
+
+
+def _chunks(data, size=65536):
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
+
+def test_chunked_upload_without_content_length_is_cut_off_while_receiving(settings, make_client, tmp_path):
+    video = make_video(tmp_path / "a.mp4")
+    data = video.read_bytes()
+    headers = {"Content-Type": "application/octet-stream", "X-File-Name": "a.mp4"}
+
+    at_limit = make_client(settings, max_upload_bytes=len(data)).post(
+        "/api/videos", content=_chunks(data), headers=headers)
+    over = make_client(settings, max_upload_bytes=len(data) - 1).post(
+        "/api/videos", content=_chunks(data), headers=headers)
+
+    assert at_limit.status_code == 201
+    assert over.status_code == 413
+    assert over.json()["error"]["code"] == "file_too_large"
+    assert not any(name.endswith(".part") for name in _stored_files(settings))
+    assert len([n for n in _stored_files(settings) if n.endswith(".bin")]) == 1
+
+
+def test_hls_playlist_referring_to_a_local_file_is_not_opened(client, tmp_path, caplog):
+    caplog.set_level(logging.INFO)
+    target = make_video(tmp_path / "target.mp4")
+    playlist = tmp_path / "playlist.m3u8"
+    playlist.write_text(f"#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nfile:{target}\n#EXT-X-ENDLIST\n")
+
+    response = _upload(client, playlist)
+
+    assert response.status_code == 422
+    probe_errors = [r for r in caplog.records if r.levelno == logging.ERROR and r.fields.get("program") == "ffprobe"]
+    tail = " ".join(probe_errors[0].fields["stderr_tail"])
+    # FFmpeg が再生リストとして解釈しなかった(参照先を開いていない)ことを、ffprobe の出力で確かめる
+    assert "Not detecting m3u8/hls" in tail or "not on whitelist" in tail
+    assert "target.mp4" not in tail

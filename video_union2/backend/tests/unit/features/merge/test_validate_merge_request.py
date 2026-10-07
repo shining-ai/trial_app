@@ -56,6 +56,16 @@ def test_floating_point_error_does_not_break_the_boundary():
     assert _check([_src(1, 600.1), _src(2, 600.2), _src(3, 599.701)])[1] == "too_long"
 
 
+def test_totals_are_summed_in_whole_milliseconds_like_the_frontend():
+    # 合計がちょうど 1800.0005 秒付近になる値。画面(frontend)の checkMergeable と同じ判定になる
+    first = [_src(i, d) for i, d in enumerate([421.507158, 429.191406, 949.301936])]
+    second = [_src(i, d) for i, d in enumerate([482.637353, 507.069465, 407.608742, 225.43726, 177.24768])]
+
+    assert _check(first) is None
+    assert _check(second) is None
+    assert _check([_src(1, 900.0004), _src(2, 900.0006)])[2] == "結合後の長さが30分を1秒超えています"
+
+
 def test_free_space_must_be_at_least_twice_the_input_size():
     sources = [_src(1, size=1000), _src(2, size=500)]
 

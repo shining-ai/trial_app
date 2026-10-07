@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from app.features.merge.format_excess import format_excess
@@ -19,14 +20,14 @@ def validate_merge_request(
     sources: list[MergeSource], *, free_bytes: int, settings: Settings
 ) -> MergeRequestFailure | None:
     """長さの合計と空き容量を確かめ、結合できないときは理由を返す(本数と重複は validate_video_ids で確かめる)。"""
-    # 浮動小数の誤差で境界を誤らないよう、ミリ秒に丸めて比べる
-    total = round(sum(s.duration_seconds for s in sources), 3)
+    # 浮動小数の足し算の誤差で画面と判定が食い違わないよう、各動画をミリ秒の整数にしてから足す
+    # (画面の useMergeQueue と同じ計算: 0.5 ミリ秒は切り上げ)
+    total_ms = sum(math.floor(s.duration_seconds * 1000 + 0.5) for s in sources)
     limit = settings.max_total_seconds
-    if total > limit:
+    if total_ms > limit * 1000:
         minutes = limit // 60
-        return MergeRequestFailure(
-            422, "too_long", f"結合後の長さが{minutes}分を{format_excess(total - limit)}超えています"
-        )
+        excess = (total_ms - limit * 1000) / 1000
+        return MergeRequestFailure(422, "too_long", f"結合後の長さが{minutes}分を{format_excess(excess)}超えています")
 
     if free_bytes < sum(s.size_bytes for s in sources) * _STORAGE_FACTOR:
         return MergeRequestFailure(507, "insufficient_storage", "保存先の空き容量が足りません")

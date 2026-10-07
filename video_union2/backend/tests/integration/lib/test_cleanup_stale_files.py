@@ -47,18 +47,30 @@ def test_old_merge_job_directory_is_removed_with_its_contents(storage):
     assert fresh.exists()
 
 
-def test_undeletable_entry_is_logged_and_raised(storage, caplog):
+def test_entry_that_cannot_be_inspected_is_logged_and_raised(storage, caplog):
     caplog.set_level(logging.INFO)
-    stuck = storage.uploads_dir() / "stuck"
-    _touch(stuck / "inner.bin", 25 * HOUR)
-    os.utime(stuck, (time.time() - 25 * HOUR,) * 2)
+    storage.uploads_dir().mkdir(parents=True)
+    # 壊れたシンボリックリンクは stat できない(コンテナは root で動くため、権限では失敗を作れない)
+    (storage.uploads_dir() / "dangling").symlink_to(storage.uploads_dir() / "missing")
 
     with pytest.raises(OSError):
         cleanup_stale_files(storage, stale_hours=24)
 
     errors = [r for r in caplog.records if r.levelno == logging.ERROR]
     assert errors and errors[0].fields["name"] == "lib.cleanup_stale_files"
-    assert "err" in errors[0].fields
+    assert "err" in errors[0].fields and "ms" in errors[0].fields
+
+
+def test_unexpected_directory_in_uploads_and_file_in_merges_are_removed(storage):
+    stray_dir = storage.uploads_dir() / "stray"
+    _touch(stray_dir / "inner.bin", 25 * HOUR)
+    os.utime(stray_dir, (time.time() - 25 * HOUR,) * 2)
+    stray_file = _touch(storage.merges_dir() / "stray.txt", 25 * HOUR)
+
+    cleanup_stale_files(storage, stale_hours=24)
+
+    assert not stray_dir.exists()
+    assert not stray_file.exists()
 
 
 def test_missing_directories_are_not_an_error(storage):

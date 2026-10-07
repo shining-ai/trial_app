@@ -51,7 +51,7 @@ def test_input_is_restricted_and_comes_right_after_dash_i():
 def test_duration_from_metadata_limits_the_output():
     args = _args(duration=2.5)
 
-    assert args[args.index("-t") + 1] == "2.5"
+    assert args[args.index("-t") + 1] == "2.500000"
 
 
 def test_video_with_audio_uses_first_audio_stream_without_anullsrc():
@@ -101,3 +101,9 @@ def test_streams_are_chosen_by_absolute_index_so_cover_art_is_skipped():
 
 def test_decoding_errors_stop_the_conversion():
     assert "-xerror" in _args()
+
+
+def test_tiny_duration_is_written_without_exponent():
+    args = _args(duration=0.00001)
+
+    assert args[args.index("-t") + 1] == "0.000010"

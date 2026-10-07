@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { ApiError } from "../../lib/apiClient";
 import { deleteVideo } from "./deleteVideo";
 import { moveItem, type MoveDirection } from "./moveItem";
+import { sumDurationMilliseconds } from "./sumDurationMilliseconds";
 import type { MergeItem } from "./types";
 
 const DELETE_FAILED_MESSAGE = "削除に失敗しました";
@@ -39,7 +40,7 @@ export function useMergeQueue() {
   return {
     items,
     videoIds: items.map((item) => item.id),
-    totalSeconds: items.reduce((sum, item) => sum + item.duration_seconds, 0),
+    totalSeconds: sumDurationMilliseconds(items.map((item) => item.duration_seconds)) / 1000,
     deleteError,
     addItem,
     move,

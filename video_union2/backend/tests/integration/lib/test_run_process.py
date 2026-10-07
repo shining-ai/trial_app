@@ -87,3 +87,11 @@ async def test_very_long_stdout_line_is_passed_whole():
     await run_process(["python3", "-c", "print('x' * 70000); print('end')"], timeout_seconds=10, on_stdout_line=lines.append)
 
     assert [len(line) for line in lines] == [70000, 3]
+
+
+async def test_very_long_stderr_line_does_not_break_failure_reporting():
+    with pytest.raises(ProcessFailedError) as exc_info:
+        await run_process(["python3", "-c", "import sys; sys.stderr.write('e' * 70000); sys.exit(2)"], timeout_seconds=10)
+
+    assert exc_info.value.returncode == 2
+    assert len(exc_info.value.stderr_tail[-1]) == 70000

@@ -35,7 +35,7 @@ def build_normalize_args(
     args += [
         "-filter_complex", f"{video_chain};{audio_chain}",
         "-map", "[v]", "-map", "[a]",
-        "-t", str(source.duration_seconds), "-shortest",
+        "-t", f"{source.duration_seconds:.6f}", "-shortest",
         "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
         "-video_track_timescale", "90000",
