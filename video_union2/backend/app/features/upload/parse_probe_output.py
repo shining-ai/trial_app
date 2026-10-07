@@ -21,12 +21,20 @@ def parse_probe_output(probe: dict) -> VideoInfo:
     width, height = int(video.get("width", 0)), int(video.get("height", 0))
     if abs(_rotation(video)) % 180 == 90:
         width, height = height, width
-    duration = _float(video.get("duration"))
-    if duration is None:
-        # Matroska・WebM はストリームの長さを tags.DURATION("00:00:01.500000000")に持つ
-        duration = _clock(video.get("tags", {}).get("DURATION"))
-    if duration is None:
-        duration = _float(fmt.get("duration"))
+    # 映像の長さ → Matroska・WebM の tags.DURATION("00:00:01.500000000")→ 入れ物の長さ、の順に、
+    # 正の値が見つかるまで探す(録画が途中で止まったファイルでは 0 が入っていることがある)
+    duration = next(
+        (
+            value
+            for value in (
+                _float(video.get("duration")),
+                _clock(video.get("tags", {}).get("DURATION")),
+                _float(fmt.get("duration")),
+            )
+            if value is not None and value > 0
+        ),
+        None,
+    )
     fps_num, fps_den = _rate(video.get("avg_frame_rate"))
     if fps_num == 0:
         fps_num, fps_den = _rate(video.get("r_frame_rate"))

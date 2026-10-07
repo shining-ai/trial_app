@@ -132,7 +132,8 @@
   "duration_seconds": 2.0,
   "width": 640, "height": 360,
   "fps_num": 30, "fps_den": 1,
-  "has_audio": true
+  "has_audio": true,
+  "video_stream_index": 0, "audio_stream_index": 1
 }
 ```
 

@@ -145,3 +145,12 @@ def test_non_finite_display_matrix_rotation_is_treated_as_no_rotation():
     info = parse_probe_output(_probe([stream]))
 
     assert (info.width, info.height) == (1920, 1080)
+
+
+def test_zero_duration_falls_through_to_the_next_source():
+    zero_stream = _video(duration="0.000000")
+    zero_tag = _video(duration=None)
+    zero_tag["tags"] = {"DURATION": "00:00:00.000000000"}
+
+    assert parse_probe_output(_probe([zero_stream], duration="2.500000")).duration_seconds == 2.5
+    assert parse_probe_output(_probe([zero_tag], format_name="matroska,webm", duration="3.000000")).duration_seconds == 3.0

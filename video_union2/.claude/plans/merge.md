@@ -67,7 +67,7 @@
   - 回転は FFmpeg の自動回転に任せる(フィルターの前に適用される)。拡大はしない(FR-007)
   - `fps` フィルターで固定フレームレートにする。低いフレームレート・可変フレームレートの動画はフレームが複製されて揃う(FR-011)
 - 音声のフィルター: `aresample=48000,aformat=channel_layouts=stereo,apad`。出力は `-shortest` で映像の長さに揃える(長い音声は切り、短い音声・無音は埋まる。Q13)
-- 使うストリーム: 最初の映像(`0:v:0`)と最初の音声(`0:a:0`。ない場合は anullsrc)(Q12)
+- 使うストリーム: 最初の映像と最初の音声を、メタ情報のストリームの絶対番号で `[0:{番号}]` と選ぶ(音声がない場合は anullsrc)(Q12、I14)
 - エンコード: `-c:v libx264 -preset {X264_PRESET} -crf {X264_CRF} -pix_fmt yuv420p -c:a aac -b:a 192k -video_track_timescale 90000`
 - 進み具合: `-progress pipe:1 -nostats` を付け、`run_process` の行ごとのコールバックで `out_time_us` を読む
 - 時間の上限: `run_process` の `timeout_seconds` = max(60, duration_seconds × `FFMPEG_TIMEOUT_PER_SECOND`)
@@ -114,7 +114,7 @@ request_id は contextvars で持つため、`create_task` したジョブのロ
 - 長さの合計が `MAX_TOTAL_SECONDS`(1800)秒以下。1800.000秒ちょうどは許可(Q13)
 - 空き容量 ≧ 入力ファイルの合計サイズ × 2(中間ファイルと結果の分の目安。FR-014)
 
-ID の形式は `schemas.py` の `MergeRequest` で32桁の16進数に限る(違えば422)。メタ情報が存在しない ID は `load_merge_sources.py` が422にする。
+ID の本数と重複はメタ情報を読む前に `validate_video_ids` で確かめる(I17)。ID の形式と存在は `load_merge_sources.py` が確かめ、どちらも `video_not_found`(422)にする(I4)。
 
 ### バックエンドのファイル
 
@@ -123,7 +123,7 @@ ID の形式は `schemas.py` の `MergeRequest` で32桁の16進数に限る(違
 | ファイル | 担当(一文) |
 |---|---|
 | `router.py` | `POST /api/merges` と `GET /api/merges/{job_id}` を受け、処理を呼んで応答を返す |
-| `schemas.py` | `MergeRequest`(IDの形式の制約を含む)と `MergeJobResponse` を定義する |
+| `schemas.py` | `MergeRequest` と `MergeJobResponse` を定義する |
 | `merge_source.py` | 結合の入力 `MergeSource` の型を定義する |
 | `load_merge_sources.py` | メタ情報ファイルを読み、`MergeSource` の列にする(存在しないIDは422) |
 | `validate_merge_request.py` | 本数・重複・長さの合計・空き容量を判定する純粋関数 |
@@ -208,10 +208,10 @@ download はジョブの状態を参照しない。`disk_storage.merge_result_pa
 - 640x360 を 1920x1080 に揃える引数に、`pad=1920:1080:(1920-iw)/2:(1080-ih)/2:color=black` を含み、`scale` を含まない
 - 入力の前に `-protocol_whitelist file` と `-format_whitelist` がある
 - `-t` にメタ情報の長さが入る
-- 音声ありの動画は `0:a:0` を使い、`anullsrc` を含まない
+- 音声ありの動画はメタ情報の音声の番号(`[0:{番号}]`)を使い、`anullsrc` を含まない
 - 音声なしの動画は `anullsrc=r=48000:cl=stereo` の入力を足し、それを使う
 - `-shortest`、`-pix_fmt yuv420p`、`-c:a aac`、設定した preset と crf を含む
-- 映像のフィルターが `setsar=1`、`fps={fps}`、`format=yuv420p` を含み、映像は `0:v:0` を使う。音声のフィルターが `aresample=48000`、`aformat=channel_layouts=stereo`、`apad` を含む(T8)
+- 映像のフィルターが `setsar=1`、`fps={fps}`、`format=yuv420p` を含み、映像はメタ情報の映像の番号(`[0:{番号}]`)を使う。音声のフィルターが `aresample=48000`、`aformat=channel_layouts=stereo`、`apad` を含む(T8)
 - 引数はすべて文字列のリストで、入力パスが `-` で始まる値として解釈されない位置にある
 
 **`merge/test_build_concat_list.py`**

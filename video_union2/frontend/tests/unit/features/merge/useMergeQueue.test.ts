@@ -179,3 +179,30 @@ test("合計が 1800.0005 秒付近でも、サーバーと同じくミリ秒の
   expect(result.current.totalSeconds).toBe(1800);
   expect(mergeable(result.current.totalSeconds, 3)).toBe(true);
 });
+
+test("「削除」を押した時点で一覧から外れ(結合に含まれない)、404以外で失敗したら元の位置に戻る", async () => {
+  let rejectDelete: (error: unknown) => void = () => {};
+  vi.mocked(deleteVideo).mockImplementation(
+    () => new Promise((_resolve, reject) => { rejectDelete = reject; }),
+  );
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 20));
+    result.current.addItem(video("c", 30));
+  });
+
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("b");
+  });
+  expect(result.current.videoIds).toEqual(["a", "c"]);
+  expect(result.current.totalSeconds).toBe(40);
+
+  await act(async () => {
+    rejectDelete(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+  expect(result.current.videoIds).toEqual(["a", "b", "c"]);
+  expect(result.current.deleteError).toBe("削除できませんでした");
+});
