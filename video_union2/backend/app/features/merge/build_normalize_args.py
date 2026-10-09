@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.features.merge.build_encode_args import build_encode_args
 from app.features.merge.merge_source import MergeSource
 from app.features.merge.plan_output_format import OutputFormat
 from app.lib.media_input_policy import input_restriction_args
@@ -36,9 +37,7 @@ def build_normalize_args(
         "-filter_complex", f"{video_chain};{audio_chain}",
         "-map", "[v]", "-map", "[a]",
         "-t", f"{source.duration_seconds:.6f}", "-shortest",
-        "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
-        "-video_track_timescale", "90000",
+        *build_encode_args(preset=preset, crf=crf),
         "-progress", "pipe:1", "-nostats",
         str(output_path),
     ]
