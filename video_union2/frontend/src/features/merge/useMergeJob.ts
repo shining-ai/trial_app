@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../lib/apiClient";
 import { fetchMergeJob } from "./fetchMergeJob";
 import { requestMerge } from "./requestMerge";
-import type { MergeJobResponse } from "./types";
+import type { MergeItem, MergeJobResponse } from "./types";
 
 const POLL_INTERVAL_MS = 1000;
 const START_FAILED_MESSAGE = "結合を始められませんでした";
@@ -36,11 +36,11 @@ export function useMergeJob() {
     };
   }, [job, retryCount]);
 
-  const start = useCallback(async (videoIds: string[]) => {
+  const start = useCallback(async (items: MergeItem[]) => {
     setRejectMessage(null);
     setIsRequesting(true);
     try {
-      setJob(await requestMerge(videoIds));
+      setJob(await requestMerge(items));
     } catch (error) {
       setRejectMessage(error instanceof ApiError ? error.message : START_FAILED_MESSAGE);
     } finally {

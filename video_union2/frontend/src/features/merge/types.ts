@@ -1,13 +1,12 @@
-export type MergeItem = {
+/** 動画の項目 */
+export type VideoItem = {
+  kind: "video";
   id: string;
   file_name: string;
   duration_seconds: number;
   width: number;
   height: number;
 };
-
-/** 動画の項目(今の MergeItem に kind を足したもの) */
-export type VideoItem = MergeItem & { kind: "video" };
 
 export type TextSceneItem = {
   kind: "text";
@@ -19,8 +18,8 @@ export type TextSceneItem = {
   durationTenths: number;
 };
 
-/** 結合リストの項目。既存の MergeItem(動画だけ)を使うコードを壊さないため別名にしている */
-export type MergeListItem = VideoItem | TextSceneItem;
+/** 結合リストの項目 */
+export type MergeItem = VideoItem | TextSceneItem;
 
 export type MergeJobStatus = "running" | "succeeded" | "failed";
 

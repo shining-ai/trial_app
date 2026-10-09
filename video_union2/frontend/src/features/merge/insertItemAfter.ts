@@ -1,11 +1,11 @@
-import type { MergeListItem } from "./types";
+import type { MergeItem } from "./types";
 
 /** 指定の id の項目の後(null なら先頭)に項目を入れた新しい配列を返す。指定の id がなければ null。 */
 export function insertItemAfter(
-  items: MergeListItem[],
+  items: MergeItem[],
   afterId: string | null,
-  item: MergeListItem,
-): MergeListItem[] | null {
+  item: MergeItem,
+): MergeItem[] | null {
   if (afterId === null) return [item, ...items];
   const index = items.findIndex((existing) => existing.id === afterId);
   if (index < 0) return null;

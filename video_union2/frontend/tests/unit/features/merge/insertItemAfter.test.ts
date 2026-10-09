@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { insertItemAfter } from "../../../../src/features/merge/insertItemAfter";
-import type { MergeListItem, TextSceneItem, VideoItem } from "../../../../src/features/merge/types";
+import type { MergeItem, TextSceneItem, VideoItem } from "../../../../src/features/merge/types";
 
 const video = (id: string): VideoItem => ({ kind: "video", id, file_name: `${id}.mp4`, duration_seconds: 1, width: 320, height: 180 });
 const text: TextSceneItem = { kind: "text", id: "text-1", text: "京都", durationTenths: 30 };
-const ids = (items: MergeListItem[] | null) => items?.map((item) => item.id);
+const ids = (items: MergeItem[] | null) => items?.map((item) => item.id);
 
 describe("insertItemAfter", () => {
   const items = [video("A"), video("B")];

@@ -9,7 +9,7 @@ const OK: MergeCheck = { mergeable: true, reason: null, message: null, excessSec
 const TOO_FEW: MergeCheck = {
   mergeable: false,
   reason: "too_few",
-  message: "結合するには2本以上の動画が必要です",
+  message: "結合するには動画とテキストの場面を合わせて2つ以上必要です",
   excessSeconds: 0,
 };
 
@@ -32,7 +32,7 @@ test("結合できないときはボタンが押せず、理由が表示され�
   render(<MergeButton check={TOO_FEW} rejectMessage={null} onMerge={onMerge} />);
 
   expect(button().disabled).toBe(true);
-  expect(screen.getByText("結合するには2本以上の動画が必要です")).toBeTruthy();
+  expect(screen.getByText("結合するには動画とテキストの場面を合わせて2つ以上必要です")).toBeTruthy();
   fireEvent.click(button());
   expect(onMerge).not.toHaveBeenCalled();
 });
@@ -57,6 +57,6 @@ test("結合できるときで断られていなければ、メッセージは�
 test("押せない理由と断られたメッセージが重なるときは、押せない理由だけを表示する", () => {
   render(<MergeButton check={TOO_FEW} rejectMessage="別の結合が実行中です" onMerge={() => {}} />);
 
-  expect(screen.getByText("結合するには2本以上の動画が必要です")).toBeTruthy();
+  expect(screen.getByText("結合するには動画とテキストの場面を合わせて2つ以上必要です")).toBeTruthy();
   expect(screen.queryByText("別の結合が実行中です")).toBeNull();
 });

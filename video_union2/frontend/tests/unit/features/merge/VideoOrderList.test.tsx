@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import type { MergeItem } from "../../../../src/features/merge/types";
+import type { VideoItem } from "../../../../src/features/merge/types";
 import { VideoOrderList } from "../../../../src/features/merge/VideoOrderList";
 
 afterEach(cleanup);
 
-function video(name: string, seconds = 65): MergeItem {
-  return { id: `id-${name}`, file_name: `${name}.mp4`, duration_seconds: seconds, width: 640, height: 360 };
+function video(name: string, seconds = 65): VideoItem {
+  return { kind: "video", id: `id-${name}`, file_name: `${name}.mp4`, duration_seconds: seconds, width: 640, height: 360 };
 }
 
 const THREE = [video("A"), video("B"), video("C")];

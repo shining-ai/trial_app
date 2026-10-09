@@ -2,13 +2,17 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { fetchMergeJob } from "../../../../src/features/merge/fetchMergeJob";
 import { requestMerge } from "../../../../src/features/merge/requestMerge";
-import type { MergeJobResponse } from "../../../../src/features/merge/types";
+import type { MergeItem, MergeJobResponse } from "../../../../src/features/merge/types";
 import { useMergeJob } from "../../../../src/features/merge/useMergeJob";
 import { ApiError } from "../../../../src/lib/apiClient";
 
 // API の応答の移り変わりを順に返すため、requestMerge と fetchMergeJob だけを差し替える
 vi.mock("../../../../src/features/merge/requestMerge", () => ({ requestMerge: vi.fn() }));
 vi.mock("../../../../src/features/merge/fetchMergeJob", () => ({ fetchMergeJob: vi.fn() }));
+
+function video(id: string): MergeItem {
+  return { kind: "video", id, file_name: `${id}.mp4`, duration_seconds: 1, width: 320, height: 180 };
+}
 
 function job(status: MergeJobResponse["status"], progress: number, message?: string): MergeJobResponse {
   return {
@@ -37,16 +41,22 @@ async function advance(milliseconds: number) {
 }
 
 describe("useMergeJob", () => {
-  test("requestMerge に、渡した並び順どおりの video_ids が送られる", async () => {
+  test("requestMerge に、渡した MergeItem[] がそのまま(変換せず、同じ並び順で)渡される", async () => {
+    const items: MergeItem[] = [
+      video("c"),
+      { kind: "text", id: "text-1", text: "京都", durationTenths: 30 },
+      video("a"),
+      video("b"),
+    ];
     vi.mocked(requestMerge).mockResolvedValue(job("running", 0));
     const { result } = renderHook(() => useMergeJob());
 
     await act(async () => {
-      await result.current.start(["c", "a", "b"]);
+      await result.current.start(items);
     });
 
     expect(requestMerge).toHaveBeenCalledTimes(1);
-    expect(requestMerge).toHaveBeenCalledWith(["c", "a", "b"]);
+    expect(requestMerge).toHaveBeenCalledWith(items);
     expect(result.current.job).toEqual(job("running", 0));
     expect(result.current.isMerging).toBe(true);
   });
@@ -58,7 +68,7 @@ describe("useMergeJob", () => {
       .mockResolvedValueOnce(job("succeeded", 1));
     const { result } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
     expect(fetchMergeJob).not.toHaveBeenCalled();
 
@@ -85,7 +95,7 @@ describe("useMergeJob", () => {
     vi.mocked(fetchMergeJob).mockResolvedValueOnce(job("failed", 0.3, "2番目の動画『b.mp4』の変換に失敗しました"));
     const { result } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     await advance(1000);
@@ -106,7 +116,7 @@ describe("useMergeJob", () => {
     const { result } = renderHook(() => useMergeJob());
 
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
     await advance(5000);
 
@@ -121,7 +131,7 @@ describe("useMergeJob", () => {
     const { result } = renderHook(() => useMergeJob());
 
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     expect(result.current.rejectMessage).toBe("結合を始められませんでした");
@@ -132,7 +142,7 @@ describe("useMergeJob", () => {
     vi.mocked(fetchMergeJob).mockRejectedValue(new ApiError(404, "job_not_found", "結合が見つかりません"));
     const { result } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     await advance(1000);
@@ -151,7 +161,7 @@ describe("useMergeJob", () => {
       .mockResolvedValueOnce(job("succeeded", 1));
     const { result } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     await advance(1000);
@@ -175,7 +185,7 @@ describe("useMergeJob", () => {
       .mockResolvedValueOnce(job("running", 0.7));
     const { result } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     await advance(1000);
@@ -197,18 +207,18 @@ describe("useMergeJob", () => {
     const { result } = renderHook(() => useMergeJob());
 
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
     expect(result.current.job?.status).toBe("succeeded");
     expect(result.current.isMerging).toBe(false);
 
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
     expect(result.current.rejectMessage).toBe("別の結合が実行中です");
 
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
     expect(result.current.rejectMessage).toBeNull();
     expect(result.current.job?.id).toBe("job2");
@@ -218,7 +228,7 @@ describe("useMergeJob", () => {
     vi.mocked(requestMerge).mockResolvedValue(job("running", 0));
     const { result, unmount } = renderHook(() => useMergeJob());
     await act(async () => {
-      await result.current.start(["a", "b"]);
+      await result.current.start([video("a"), video("b")]);
     });
 
     unmount();

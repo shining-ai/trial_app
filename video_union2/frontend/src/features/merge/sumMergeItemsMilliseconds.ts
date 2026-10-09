@@ -1,8 +1,8 @@
 import { sumDurationMilliseconds } from "./sumDurationMilliseconds";
-import type { MergeListItem } from "./types";
+import type { MergeItem } from "./types";
 
 /** 結合リストの合計の長さをミリ秒の整数で返す(動画は sumDurationMilliseconds と同じ丸め、テキストの場面は 0.1秒単位 × 100)。 */
-export function sumMergeItemsMilliseconds(items: MergeListItem[]): number {
+export function sumMergeItemsMilliseconds(items: MergeItem[]): number {
   const videoMilliseconds = sumDurationMilliseconds(
     items.flatMap((item) => (item.kind === "video" ? [item.duration_seconds] : [])),
   );

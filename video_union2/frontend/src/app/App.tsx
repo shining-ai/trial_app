@@ -14,13 +14,15 @@ export function App() {
   const mergeQueue = useMergeQueue();
   const mergeJob = useMergeJob();
   const uploadQueue = useUploadQueue({
-    mergeCount: mergeQueue.items.length,
-    onUploaded: mergeQueue.addItem,
+    mergeCount: mergeQueue.videoCount,
+    onUploaded: (video) => mergeQueue.addItem({ ...video, kind: "video" }),
   });
   const check = checkMergeable({
-    count: mergeQueue.items.length,
+    videoCount: mergeQueue.videoCount,
+    itemCount: mergeQueue.items.length,
     totalSeconds: mergeQueue.totalSeconds,
     isMerging: mergeJob.isMerging,
+    isEditing: mergeQueue.editor !== null,
   });
 
   return (
@@ -46,7 +48,7 @@ export function App() {
         <MergeButton
           check={check}
           rejectMessage={mergeJob.rejectMessage}
-          onMerge={() => void mergeJob.start(mergeQueue.videoIds)}
+          onMerge={() => void mergeJob.start(mergeQueue.items)}
         />
         <MergeProgress job={mergeJob.job} />
         {mergeJob.job?.status === "succeeded" ? <DownloadLink jobId={mergeJob.job.id} /> : null}

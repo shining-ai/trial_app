@@ -51,17 +51,17 @@ test("アップロードが完了した動画は、完了順に結合リスト�
   expect(within(orderList).getByText("b.mp4")).toBeTruthy();
 });
 
-test("1本だけのときは結合ボタンが押せず、理由が表示される", async () => {
+test("動画1本だけのときは結合ボタンが押せず、理由が表示される", async () => {
   render(<App />);
 
   await selectFiles("a.mp4");
 
   await screen.findByText("合計 1:00 / 30:00");
   expect((screen.getByRole("button", { name: "結合する" }) as HTMLButtonElement).disabled).toBe(true);
-  expect(screen.getByText("結合するには2本以上の動画が必要です")).toBeTruthy();
+  expect(screen.getByText("結合するには動画とテキストの場面を合わせて2つ以上必要です")).toBeTruthy();
 });
 
-test("画面で並べ替えた順の video_ids で結合を始め、進み具合を表示し、完了したらダウンロードリンクを表示する", async () => {
+test("画面で並べ替えた順の items で結合を始め、進み具合を表示し、完了したらダウンロードリンクを表示する", async () => {
   vi.mocked(requestMerge).mockResolvedValue({ id: "job1", status: "running", progress: 0.25, error: null });
   vi.mocked(fetchMergeJob).mockResolvedValue({ id: "job1", status: "succeeded", progress: 1, error: null });
   render(<App />);
@@ -72,10 +72,11 @@ test("画面で並べ替えた順の video_ids で結合を始め、進み具合
   fireEvent.click(screen.getByRole("button", { name: "結合する" }));
 
   await waitFor(() => expect(requestMerge).toHaveBeenCalledTimes(1));
-  const videoIds = vi.mocked(requestMerge).mock.calls[0][0];
-  expect(videoIds).toHaveLength(3);
-  expect(videoIds[0]).toBe("id-c.mp4");
-  expect(videoIds).toEqual(["id-c.mp4", expect.stringMatching(/^id-[ab]\.mp4$/), expect.stringMatching(/^id-[ab]\.mp4$/)]);
+  const items = vi.mocked(requestMerge).mock.calls[0][0];
+  expect(items).toHaveLength(3);
+  expect(items.every((item) => item.kind === "video")).toBe(true);
+  expect(items[0].id).toBe("id-c.mp4");
+  expect(items.map((item) => item.id)).toEqual(["id-c.mp4", expect.stringMatching(/^id-[ab]\.mp4$/), expect.stringMatching(/^id-[ab]\.mp4$/)]);
   expect(await screen.findByText("25%")).toBeTruthy();
 
   const link = await screen.findByRole("link", { name: "ダウンロード" }, { timeout: 3000 });
