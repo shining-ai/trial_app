@@ -1,3 +1,4 @@
+from app.features.merge.merge_segment import TextScene
 from app.features.merge.merge_source import MergeSource
 from app.features.merge.validate_merge_request import validate_merge_request, validate_video_ids
 from app.lib.config import Settings
@@ -6,9 +7,9 @@ SETTINGS = Settings()
 PLENTY = 10**15
 
 
-def _src(i, duration=1.0, size=100):
+def _src(i, duration=1.0, size=100, width=640, height=360):
     return MergeSource(video_id=f"{i:032x}", file_name=f"{i}.mp4", size_bytes=size, duration_seconds=duration,
-                       width=640, height=360, fps_num=30, fps_den=1, has_audio=True, video_stream_index=0, audio_stream_index=1)
+                       width=width, height=height, fps_num=30, fps_den=1, has_audio=True, video_stream_index=0, audio_stream_index=1)
 
 
 def _check(sources, free=PLENTY, settings=SETTINGS):
@@ -78,3 +79,31 @@ def test_limits_come_from_settings():
 
     assert _check([_src(1, 1.0), _src(2, 1.0)], settings=small) is None
     assert _check([_src(1, 1.0), _src(2, 1.5)], settings=small)[1] == "too_long"
+
+
+def _text(tenths):
+    return TextScene(lines=("京都",), duration_tenths=tenths)
+
+
+def _check_segments(segments, free=PLENTY, settings=SETTINGS):
+    failure = validate_merge_request(segments, free_bytes=free, settings=settings)
+    return None if failure is None else (failure.status, failure.code, failure.message)
+
+
+def test_text_scene_durations_are_added_to_the_total():
+    assert _check_segments([_src(1, 1790.0), _text(100)]) is None
+    assert _check_segments([_src(1, 1790.0), _text(101)]) == (
+        422, "too_long", "結合後の長さが30分を1秒超えています")
+
+
+def test_text_scene_durations_are_summed_in_whole_milliseconds():
+    assert _check_segments([_src(1, 600.1), _src(2, 600.2), _text(5997)]) is None
+    assert _check_segments([_src(1, 600.1), _src(2, 600.2), _text(5998)])[1] == "too_long"
+
+
+def test_text_scene_needs_an_output_whose_short_side_is_at_least_23_pixels():
+    message = "動画の解像度が小さすぎて、テキストの場面を表示できません(出力の短い辺が23ピクセル以上必要です)"
+
+    assert _check_segments([_src(1, width=22, height=22), _text(30)]) == (422, "output_too_small_for_text", message)
+    assert _check_segments([_src(1, width=24, height=24), _text(30)]) is None
+    assert _check_segments([_src(1, width=22, height=22), _src(2, width=22, height=22)]) is None
