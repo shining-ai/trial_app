@@ -187,11 +187,19 @@ test("「先頭にテキストを挿入」は afterId null、各行の「この�
 
   fireEvent.click(screen.getByRole("button", { name: "先頭にテキストを挿入" }));
   const rows = rowsOf();
-  fireEvent.click(within(rows[0]).getByRole("button", { name: "この後にテキストを挿入" }));
-  fireEvent.click(within(rows[1]).getByRole("button", { name: "この後にテキストを挿入" }));
-  fireEvent.click(within(rows[2]).getByRole("button", { name: "この後にテキストを挿入" }));
+  fireEvent.click(within(rows[0]).getByRole("button", { name: "A.mp4 の後にテキストを挿入" }));
+  fireEvent.click(within(rows[1]).getByRole("button", { name: `${SCENE_LABEL} の後にテキストを挿入` }));
+  fireEvent.click(within(rows[2]).getByRole("button", { name: "B.mp4 の後にテキストを挿入" }));
 
   expect(props.onOpenInsert.mock.calls).toEqual([[null], ["id-A"], ["text-1"], ["id-B"]]);
+});
+
+test("各行の挿入ボタンは、見た目は「この後にテキストを挿入」のまま、読み上げではどの行の後かがわかる", () => {
+  renderList({ items: WITH_SCENE });
+
+  const button = within(rowsOf()[0]).getByRole("button", { name: "A.mp4 の後にテキストを挿入" });
+
+  expect(button.textContent).toBe("この後にテキストを挿入");
 });
 
 test("先頭への挿入の入力欄は、一覧の上に開く", () => {

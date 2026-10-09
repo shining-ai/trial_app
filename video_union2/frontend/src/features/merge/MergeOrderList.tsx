@@ -71,9 +71,9 @@ export function MergeOrderList(props: {
     });
   }
 
-  function renderInsertButton(item: MergeItem): ReactNode {
+  function renderInsertButton(item: MergeItem, name: string): ReactNode {
     return (
-      <button type="button" disabled={locked} onClick={() => onOpenInsert(item.id)}>
+      <button type="button" aria-label={`${name} の後にテキストを挿入`} disabled={locked} onClick={() => onOpenInsert(item.id)}>
         この後にテキストを挿入
       </button>
     );
@@ -94,7 +94,7 @@ export function MergeOrderList(props: {
         <button type="button" aria-label={`${name} を削除`} disabled={locked} onClick={() => onRemove(item.id)}>
           削除
         </button>{" "}
-        {renderInsertButton(item)}
+        {renderInsertButton(item, name)}
       </>
     );
   }
@@ -113,7 +113,7 @@ export function MergeOrderList(props: {
         >
           削除
         </button>{" "}
-        {renderInsertButton(item)}
+        {renderInsertButton(item, item.file_name)}
       </>
     );
   }

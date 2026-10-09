@@ -21,5 +21,7 @@ export default function globalSetup() {
   // 30分を超える組み合わせの確認用(低解像度・1fps なので数秒で作れる)
   makeVideo("long-a.mp4", "red", 16, 16, 901, 1);
   makeVideo("long-b.mp4", "blue", 16, 16, 901, 1);
+  // テキストの場面を足すと30分を超える組み合わせの確認用(901秒 + 899秒 = 30:00 ちょうど。テキストの場面1.0秒で 30:01)
+  makeVideo("long-899.mp4", "blue", 16, 16, 899, 1);
   writeFileSync(videoPath("not_a_video.mp4"), "これは動画ではなく、拡張子だけが .mp4 のテキストファイルです。\n");
 }
