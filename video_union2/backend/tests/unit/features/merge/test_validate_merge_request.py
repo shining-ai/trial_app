@@ -89,6 +89,14 @@ def test_ntsc_frame_rounding_within_one_frame_is_judged_like_the_screen():
     assert _check_segments([ntsc, _text(101)]) == (422, "too_long", "結合後の長さが30分を1秒超えています")
 
 
+def test_ntsc_rounding_of_several_text_scenes_is_allowed_up_to_one_frame_in_total():
+    # 10.0 秒 × 3 は丸めて +30ms(1フレーム 33.37ms 以内)なので許可
+    assert _check_segments([_video_at(30000, 1001, 1770.0)] + [_text(100)] * 3) is None
+    # 16.5 秒 × 2 は丸めて +34ms で1フレームを超えるため、指定の合計がちょうど30分でも断る(既知の制限 I-6)
+    assert _check_segments([_video_at(30000, 1001, 1767.0)] + [_text(165)] * 2) == (
+        422, "too_long", "結合後の長さが30分を1秒超えています")
+
+
 def test_low_fps_rounding_that_lengthens_the_output_beyond_one_frame_is_rejected():
     one_fps = _video_at(1, 1, 1.0)
     limit = Settings(max_total_seconds=7)
