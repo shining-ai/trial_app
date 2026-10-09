@@ -26,9 +26,11 @@ MergeRequestItem = Annotated[VideoItem | TextItem, Field(discriminator="type")]
 
 
 class MergeRequest(BaseModel):
-    """結合の依頼。video_ids は並び順どおり。ID の形式と存在は load_merge_sources で確かめる。"""
+    """結合の依頼。items は並び順どおり(動画とテキストの場面)。"""
 
-    video_ids: list[str]
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[MergeRequestItem]
 
 
 class ErrorDetail(BaseModel):

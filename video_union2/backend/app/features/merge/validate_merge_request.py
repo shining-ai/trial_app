@@ -8,7 +8,6 @@ from app.features.merge.merge_source import MergeSource
 from app.features.merge.plan_output_format import plan_output_format
 from app.lib.config import Settings
 
-_MIN_VIDEOS = 2
 _STORAGE_FACTOR = 2
 
 
@@ -53,13 +52,3 @@ def validate_merge_request(
         return MergeRequestFailure(507, "insufficient_storage", "保存先の空き容量が足りません")
     return None
 
-
-def validate_video_ids(video_ids: list[str], settings: Settings) -> MergeRequestFailure | None:
-    """メタ情報を読む前に、ID の本数と重複を確かめる。"""
-    if len(video_ids) < _MIN_VIDEOS:
-        return MergeRequestFailure(422, "too_few_videos", "結合するには2本以上の動画が必要です")
-    if len(video_ids) > settings.max_videos:
-        return MergeRequestFailure(422, "too_many_videos", f"一度に結合できるのは{settings.max_videos}本までです")
-    if len(set(video_ids)) != len(video_ids):
-        return MergeRequestFailure(422, "duplicate_video", "同じ動画が2回指定されています")
-    return None

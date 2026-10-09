@@ -30,6 +30,10 @@ def _unsupported(causes: list[str]) -> SceneTextFailure:
 
 
 def normalize_scene_text(text: str, font_code_points: frozenset[int]) -> tuple[str, ...] | SceneTextFailure:
+    """テキストを正規化して行に分け、行数・1行の文字数・全体の文字数・使えない文字を確かめる。
+
+    だめなら理由を返す(番号は付けない。呼び出し側がリストでの位置を付ける)。
+    """
     text = text.replace("\r\n", "\n")
     text = unicodedata.normalize("NFC", text)
     # 取り除く処理より前に確かめる(先頭・末尾のタブなども拒否するため)

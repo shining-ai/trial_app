@@ -1,12 +1,12 @@
 import pytest
 
-from app.features.merge.layout_text_scene import layout_text_scene, text_scene_font_size
+from app.features.merge.layout_text_scene import TextSceneLayoutError, layout_text_scene, text_scene_font_size
 
 
 def test_font_size_alone_can_be_computed_before_measuring_lines():
     assert text_scene_font_size(1080, 1920) == 48
     assert text_scene_font_size(24, 23) == 1
-    with pytest.raises(ValueError):
+    with pytest.raises(TextSceneLayoutError):
         text_scene_font_size(16, 16)
 
 
@@ -33,7 +33,7 @@ def test_line_width_up_to_90_percent_of_the_output_width_is_allowed():
 
 
 def test_line_wider_than_90_percent_of_the_output_width_is_rejected_without_its_text():
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(TextSceneLayoutError) as error:
         layout_text_scene(1080, 1920, [100.0, 973.0])
 
     assert str(error.value) == "2行目の幅 973px が出力 1080x1920 の描ける幅 972px を超えています"
@@ -41,7 +41,7 @@ def test_line_wider_than_90_percent_of_the_output_width_is_rejected_without_its_
 
 def test_output_with_short_side_23_has_font_size_1_and_smaller_is_rejected():
     assert layout_text_scene(24, 23, [1.0]).font_size == 1
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(TextSceneLayoutError) as error:
         layout_text_scene(16, 16, [1.0])
 
     assert str(error.value) == "出力 16x16 では文字の大きさが1ピクセル未満になります"

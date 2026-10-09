@@ -1,6 +1,6 @@
 from app.features.merge.merge_segment import TextScene
 from app.features.merge.merge_source import MergeSource
-from app.features.merge.validate_merge_request import validate_merge_request, validate_video_ids
+from app.features.merge.validate_merge_request import validate_merge_request
 from app.lib.config import Settings
 
 SETTINGS = Settings()
@@ -13,35 +13,8 @@ def _src(i, duration=1.0, size=100, width=640, height=360):
 
 
 def _check(sources, free=PLENTY, settings=SETTINGS):
-    failure = validate_video_ids([s.video_id for s in sources], settings) or validate_merge_request(
-        sources, free_bytes=free, settings=settings)
+    failure = validate_merge_request(sources, free_bytes=free, settings=settings)
     return None if failure is None else (failure.status, failure.code, failure.message)
-
-
-def test_ids_are_checked_for_count_and_duplicates_before_reading_anything():
-    ids = ["a" * 32] * 200_000
-
-    failure = validate_video_ids(ids, SETTINGS)
-
-    assert (failure.status, failure.code) == (422, "too_many_videos")
-    assert validate_video_ids(["a" * 32, "a" * 32], SETTINGS).code == "duplicate_video"
-    assert validate_video_ids(["a" * 32, "b" * 32], SETTINGS) is None
-
-
-def test_two_videos_are_allowed_and_fewer_are_rejected():
-    assert _check([_src(1), _src(2)]) is None
-    assert _check([_src(1)]) == (422, "too_few_videos", "結合するには2本以上の動画が必要です")
-    assert _check([]) == (422, "too_few_videos", "結合するには2本以上の動画が必要です")
-
-
-def test_100_videos_are_allowed_and_101_are_rejected():
-    assert _check([_src(i, duration=1.0) for i in range(100)]) is None
-    assert _check([_src(i, duration=1.0) for i in range(101)]) == (
-        422, "too_many_videos", "一度に結合できるのは100本までです")
-
-
-def test_duplicate_video_is_rejected():
-    assert _check([_src(1), _src(1)]) == (422, "duplicate_video", "同じ動画が2回指定されています")
 
 
 def test_total_of_exactly_1800_seconds_is_allowed_and_over_is_rejected_with_excess():
