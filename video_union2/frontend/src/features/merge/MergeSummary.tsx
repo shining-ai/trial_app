@@ -4,9 +4,11 @@ import { formatExcess } from "./formatExcess";
 
 export function MergeSummary({ totalSeconds, excessSeconds }: { totalSeconds: number; excessSeconds: number }) {
   return (
-    <div>
-      <p>{`合計 ${formatDuration(totalSeconds)} / ${formatDuration(MAX_TOTAL_SECONDS)}`}</p>
-      {excessSeconds > 0 ? <p>{`結合後の長さが30分を${formatExcess(excessSeconds)}超えています`}</p> : null}
+    <div className="merge-summary">
+      <p className="merge-summary__total">{`合計 ${formatDuration(totalSeconds)} / ${formatDuration(MAX_TOTAL_SECONDS)}`}</p>
+      {excessSeconds > 0 ? (
+        <p className="merge-summary__excess">{`結合後の長さが30分を${formatExcess(excessSeconds)}超えています`}</p>
+      ) : null}
     </div>
   );
 }

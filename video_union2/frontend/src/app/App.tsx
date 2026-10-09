@@ -26,9 +26,13 @@ export function App() {
   });
 
   return (
-    <main>
-      <h1>動画結合アプリ</h1>
-      <section aria-label="アップロード">
+    <main className="app">
+      <header>
+        <h1 className="app__title">動画結合アプリ</h1>
+        <p className="app__lead">動画を選んで順番を決め、見出しを挟んで1本につなげます。</p>
+      </header>
+      <section aria-label="アップロード" className="card">
+        <h2 className="card__title">1. 動画を選ぶ</h2>
         <UploadForm
           remainingSlots={uploadQueue.remainingSlots}
           showLimitNotice={uploadQueue.limitExceeded}
@@ -36,7 +40,8 @@ export function App() {
         />
         <UploadList items={uploadQueue.items} />
       </section>
-      <section aria-label="結合">
+      <section aria-label="結合" className="card">
+        <h2 className="card__title">2. 並べて結合する</h2>
         <MergeOrderList
           items={mergeQueue.items}
           editor={mergeQueue.editor}
@@ -50,12 +55,14 @@ export function App() {
           onConfirmText={mergeQueue.confirmText}
           onCloseEditor={mergeQueue.closeEditor}
         />
-        <MergeSummary totalSeconds={mergeQueue.totalSeconds} excessSeconds={check.excessSeconds} />
-        <MergeButton
-          check={check}
-          rejectMessage={mergeJob.rejectMessage}
-          onMerge={() => void mergeJob.start(mergeQueue.items)}
-        />
+        <div className="merge-footer">
+          <MergeSummary totalSeconds={mergeQueue.totalSeconds} excessSeconds={check.excessSeconds} />
+          <MergeButton
+            check={check}
+            rejectMessage={mergeJob.rejectMessage}
+            onMerge={() => void mergeJob.start(mergeQueue.items)}
+          />
+        </div>
         <MergeProgress job={mergeJob.job} />
         {mergeJob.job?.status === "succeeded" ? <DownloadLink jobId={mergeJob.job.id} /> : null}
       </section>

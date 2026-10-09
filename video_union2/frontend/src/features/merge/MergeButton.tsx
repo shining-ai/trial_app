@@ -5,11 +5,15 @@ export function MergeButton(props: { check: MergeCheck; rejectMessage: string | 
   const message = check.message ?? rejectMessage;
 
   return (
-    <div>
-      <button type="button" disabled={!check.mergeable} onClick={onMerge}>
+    <div className="merge-button">
+      {message ? (
+        <span role="status" className="merge-button__status">
+          {message}
+        </span>
+      ) : null}
+      <button type="button" className="btn btn--primary" disabled={!check.mergeable} onClick={onMerge}>
         結合する
       </button>
-      {message ? <span role="status">{message}</span> : null}
     </div>
   );
 }

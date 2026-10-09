@@ -1,0 +1,584 @@
+/* 画面全体の見た目。部品の振る舞いは変えず、クラスで見た目だけを決める */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f8f9fb;
+  --border: #e3e6eb;
+  --text: #1c2026;
+  --text-muted: #667085;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef0ff;
+  --danger: #d92d20;
+  --danger-soft: #fef3f2;
+  --success: #079455;
+  --scene: #7c3aed;
+  --scene-soft: #f5f0ff;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 6%);
+  --focus: 0 0 0 3px rgb(79 70 229 / 35%);
+  /* 濃い色のボタンの上の文字 */
+  --on-accent: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --surface: #171a21;
+    --surface-muted: #1d2129;
+    --border: #2a2f3a;
+    --text: #e7e9ee;
+    --text-muted: #98a2b3;
+    --accent: #818cf8;
+    --accent-hover: #a5b4fc;
+    --accent-soft: #1f2340;
+    --danger: #f97066;
+    --danger-soft: #2b1715;
+    --success: #47cd89;
+    --scene: #b794f6;
+    --scene-soft: #241a38;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 16px rgb(0 0 0 / 30%);
+    /* ダークではボタンの色が明るいので、文字は濃くする */
+    --on-accent: #0f1115;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- レイアウト ---- */
+
+.app {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+  display: grid;
+  gap: 20px;
+}
+
+.app__title {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.app__lead {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.card__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ---- ボタン ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: var(--text-muted);
+}
+
+.btn:focus-visible,
+.field__input:focus-visible,
+.file-picker:focus-within {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 15px;
+  min-height: 44px;
+  padding: 8px 28px;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.btn--add {
+  border-style: dashed;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: transparent;
+}
+
+.btn--add:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.btn--add::before {
+  content: "+";
+  font-weight: 700;
+}
+
+/* ---- アップロード ---- */
+
+.upload-form {
+  display: grid;
+  gap: 8px;
+}
+
+.file-picker {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.file-picker:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.file-picker__label {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.file-picker__hint {
+  font-size: 13px;
+}
+
+.file-picker--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 見た目からは隠すが、ラベルのクリックと読み上げでは使えるようにする */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.upload-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.upload-list:empty {
+  display: none;
+}
+
+.upload-list__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  font-size: 14px;
+}
+
+.upload-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-list__status {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.upload-list__status--failed {
+  color: var(--danger);
+}
+
+/* ---- 結合リスト ---- */
+
+.merge-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  counter-reset: merge-item;
+}
+
+.merge-list:empty {
+  display: none;
+}
+
+.merge-item {
+  counter-increment: merge-item;
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 12px 52px;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.merge-item::before {
+  content: counter(merge-item);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.merge-item--text {
+  border-color: color-mix(in srgb, var(--scene) 35%, var(--border));
+  background: var(--scene-soft);
+}
+
+.merge-item--text::before {
+  background: var(--scene);
+  color: var(--on-accent);
+}
+
+.merge-item__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.merge-item__main {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.merge-item__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge-item--text .merge-item__name {
+  color: var(--scene);
+}
+
+.merge-item__meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.merge-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.merge-list-area {
+  display: grid;
+  gap: 12px;
+}
+
+.merge-list__head {
+  display: flex;
+}
+
+/* ---- テキストの場面の入力欄 ---- */
+
+.scene-editor {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--scene);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--scene-soft);
+}
+
+.scene-editor__fields {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .scene-editor__fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.field__label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field__input:hover {
+  border-color: var(--text-muted);
+}
+
+textarea.field__input {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field__hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-editor__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.scene-editor__actions .btn {
+  min-height: 36px;
+  padding: 6px 16px;
+}
+
+.scene-editor__confirm {
+  background: var(--scene);
+  border-color: var(--scene);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.scene-editor__confirm:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--scene) 85%, #000);
+  border-color: color-mix(in srgb, var(--scene) 85%, #000);
+}
+
+/* ---- メッセージ ---- */
+
+.message {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.message--error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.message--notice {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+/* ---- 合計・結合・進み具合 ---- */
+
+.merge-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.merge-summary {
+  display: grid;
+  gap: 2px;
+}
+
+.merge-summary__total {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.merge-summary__excess {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.merge-button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.merge-button__status {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.merge-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.merge-progress__bar {
+  flex: 1;
+  height: 8px;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.merge-progress__bar::-webkit-progress-bar {
+  background: var(--surface-muted);
+  border-radius: 999px;
+}
+
+.merge-progress__bar::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+.merge-progress__bar::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.merge-progress__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 3em;
+  text-align: right;
+}
+
+.download {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  color: var(--success);
+  font-weight: 600;
+}
+
+.download__link {
+  text-decoration: none;
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--on-accent);
+}
+
+.download__link:hover {
+  filter: brightness(1.08);
+}

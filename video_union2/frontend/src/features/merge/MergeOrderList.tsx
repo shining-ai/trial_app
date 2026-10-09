@@ -61,6 +61,7 @@ export function MergeOrderList(props: {
         <button
           key={direction}
           type="button"
+          className="btn btn--ghost"
           aria-label={`${name} を${label}`}
           disabled={locked || atEdge}
           onClick={() => onMove(index, direction)}
@@ -73,7 +74,13 @@ export function MergeOrderList(props: {
 
   function renderInsertButton(item: MergeItem, name: string): ReactNode {
     return (
-      <button type="button" aria-label={`${name} の後にテキストを挿入`} disabled={locked} onClick={() => onOpenInsert(item.id)}>
+      <button
+        type="button"
+        className="btn btn--add"
+        aria-label={`${name} の後にテキストを挿入`}
+        disabled={locked}
+        onClick={() => onOpenInsert(item.id)}
+      >
         この後にテキストを挿入
       </button>
     );
@@ -83,54 +90,78 @@ export function MergeOrderList(props: {
     const { firstLine, hasMore } = summarizeSceneText(item.text);
     const name = `テキストの場面: ${firstLine}`;
     return (
-      <>
-        <span role="img" aria-label={name}>
-          {`📝 ${firstLine}${hasMore ? "…" : ""}(${formatTenths(item.durationTenths)}秒)`}
-        </span>{" "}
-        {renderMoveButtons(index, name)}
-        <button type="button" aria-label={`${name} を編集`} disabled={locked} onClick={() => onOpenEdit(item.id)}>
-          編集
-        </button>
-        <button type="button" aria-label={`${name} を削除`} disabled={locked} onClick={() => onRemove(item.id)}>
-          削除
-        </button>{" "}
-        {renderInsertButton(item, name)}
-      </>
+      <div className="merge-item__row">
+        <div className="merge-item__main">
+          <span role="img" aria-label={name} className="merge-item__name">
+            {`📝 ${firstLine}${hasMore ? "…" : ""}(${formatTenths(item.durationTenths)}秒)`}
+          </span>
+          <span className="merge-item__meta">テキストの場面</span>
+        </div>{" "}
+        <div className="merge-item__actions">
+          {renderMoveButtons(index, name)}
+          <button
+            type="button"
+            className="btn btn--ghost"
+            aria-label={`${name} を編集`}
+            disabled={locked}
+            onClick={() => onOpenEdit(item.id)}
+          >
+            編集
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--danger"
+            aria-label={`${name} を削除`}
+            disabled={locked}
+            onClick={() => onRemove(item.id)}
+          >
+            削除
+          </button>{" "}
+          {renderInsertButton(item, name)}
+        </div>
+      </div>
     );
   }
 
   function renderVideo(item: MergeItem & { kind: "video" }, index: number): ReactNode {
     return (
-      <>
-        <span>{item.file_name}</span>{" "}
-        <span>{`${formatDuration(item.duration_seconds)} / ${item.width}x${item.height}`}</span>{" "}
-        {renderMoveButtons(index, item.file_name)}
-        <button
-          type="button"
-          aria-label={`${item.file_name} を削除`}
-          disabled={locked}
-          onClick={() => onRemove(item.id)}
-        >
-          削除
-        </button>{" "}
-        {renderInsertButton(item, item.file_name)}
-      </>
+      <div className="merge-item__row">
+        <div className="merge-item__main">
+          <span className="merge-item__name">{item.file_name}</span>{" "}
+          <span className="merge-item__meta">{`${formatDuration(item.duration_seconds)} / ${item.width}x${item.height}`}</span>
+        </div>{" "}
+        <div className="merge-item__actions">
+          {renderMoveButtons(index, item.file_name)}
+          <button
+            type="button"
+            className="btn btn--ghost btn--danger"
+            aria-label={`${item.file_name} を削除`}
+            disabled={locked}
+            onClick={() => onRemove(item.id)}
+          >
+            削除
+          </button>{" "}
+          {renderInsertButton(item, item.file_name)}
+        </div>
+      </div>
     );
   }
 
   return (
-    <div>
-      <button type="button" disabled={locked} onClick={() => onOpenInsert(null)}>
-        先頭にテキストを挿入
-      </button>
+    <div className="merge-list-area">
+      <div className="merge-list__head">
+        <button type="button" className="btn btn--add" disabled={locked} onClick={() => onOpenInsert(null)}>
+          先頭にテキストを挿入
+        </button>
+      </div>
       {editor?.mode === "insert" && editor.afterId === null
         ? renderEditor({ text: "", duration: DEFAULT_DURATION })
         : null}
-      <ol aria-label="結合リスト">
+      <ol aria-label="結合リスト" className="merge-list">
         {items.map((item, index) => {
           const editing = editor?.mode === "edit" && editor.id === item.id && item.kind === "text";
           return (
-            <li key={item.id}>
+            <li key={item.id} className={`merge-item${item.kind === "text" ? " merge-item--text" : ""}`}>
               {editing
                 ? renderEditor({ text: item.text, duration: formatTenths(item.durationTenths) })
                 : item.kind === "text"
@@ -144,7 +175,11 @@ export function MergeOrderList(props: {
         })}
       </ol>
       {insertTargetMissing ? renderEditor({ text: "", duration: DEFAULT_DURATION }) : null}
-      {deleteError ? <p role="alert">{deleteError}</p> : null}
+      {deleteError ? (
+        <p role="alert" className="message message--error">
+          {deleteError}
+        </p>
+      ) : null}
     </div>
   );
 }

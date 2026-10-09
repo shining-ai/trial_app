@@ -30,31 +30,48 @@ export function TextSceneEditor(props: {
   }
 
   return (
-    <div>
-      <div>
-        <label htmlFor={textId}>テキスト</label>
-        <textarea id={textId} rows={5} value={text} onChange={(event) => setText(event.target.value)} />
-        <span>{`${lineCount}/5行、${charCount}/100文字`}</span>
+    <div className="scene-editor">
+      <div className="scene-editor__fields">
+        <div className="field">
+          <label className="field__label" htmlFor={textId}>
+            テキスト
+          </label>
+          <textarea
+            id={textId}
+            className="field__input"
+            rows={5}
+            placeholder={"例: 2026年10月9日\n京都 嵐山"}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+          />
+          <span className="field__hint">{`${lineCount}/5行、${charCount}/100文字`}</span>
+        </div>
+        <div className="field">
+          <label className="field__label" htmlFor={durationId}>
+            表示時間(秒)
+          </label>
+          <input
+            id={durationId}
+            className="field__input"
+            type="text"
+            inputMode="decimal"
+            value={duration}
+            onChange={(event) => setDuration(event.target.value)}
+          />
+          <span className="field__hint">1〜60秒、0.1秒単位</span>
+        </div>
       </div>
-      <div>
-        <label htmlFor={durationId}>表示時間(秒)</label>
-        <input
-          id={durationId}
-          type="text"
-          inputMode="decimal"
-          value={duration}
-          onChange={(event) => setDuration(event.target.value)}
-        />
+      {textError ? <p role="alert" className="message message--error">{textError}</p> : null}
+      {durationError ? <p role="alert" className="message message--error">{durationError}</p> : null}
+      {error ? <p role="alert" className="message message--error">{error}</p> : null}
+      <div className="scene-editor__actions">
+        <button type="button" className="btn scene-editor__confirm" onClick={confirm}>
+          確定
+        </button>
+        <button type="button" className="btn btn--ghost" onClick={onCancel}>
+          取り消し
+        </button>
       </div>
-      <button type="button" onClick={confirm}>
-        確定
-      </button>
-      <button type="button" onClick={onCancel}>
-        取り消し
-      </button>
-      {textError ? <p role="alert">{textError}</p> : null}
-      {durationError ? <p role="alert">{durationError}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
     </div>
   );
 }
