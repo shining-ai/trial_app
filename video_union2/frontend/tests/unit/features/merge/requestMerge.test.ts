@@ -5,7 +5,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("POST /api/merges に video_ids を並び順どおりに JSON で送り、ジョブを返す", async () => {
+test("POST /api/merges に items(動画の場面)を並び順どおりに JSON で送り、ジョブを返す", async () => {
   const job = { id: "job1", status: "running", progress: 0, error: null };
   const fetchStub = vi.fn().mockResolvedValue(new Response(JSON.stringify(job), { status: 202 }));
   vi.stubGlobal("fetch", fetchStub);
@@ -18,7 +18,13 @@ test("POST /api/merges に video_ids を並び順どおりに JSON で送り、�
   expect(path).toBe("/api/merges");
   expect(init.method).toBe("POST");
   expect(init.headers).toEqual({ "Content-Type": "application/json" });
-  expect(JSON.parse(init.body)).toEqual({ video_ids: ["c", "a", "b"] });
+  expect(JSON.parse(init.body)).toEqual({
+    items: [
+      { type: "video", video_id: "c" },
+      { type: "video", video_id: "a" },
+      { type: "video", video_id: "b" },
+    ],
+  });
 });
 
 test("409 のときはサーバーの message を持つ ApiError で失敗する", async () => {

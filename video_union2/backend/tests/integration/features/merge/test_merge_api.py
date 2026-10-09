@@ -20,8 +20,12 @@ def _result_path(settings, job_id):
     return settings.storage_dir / "merges" / job_id / "result.mp4"
 
 
+def _items_body(ids):
+    return {"items": [{"type": "video", "video_id": video_id} for video_id in ids]}
+
+
 def _merge(client, ids):
-    return client.post("/api/merges", json={"video_ids": ids})
+    return client.post("/api/merges", json=_items_body(ids))
 
 
 def _merge_ok(client, settings, ids):
@@ -181,20 +185,22 @@ def test_total_length_limit_from_settings(settings, make_client, tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("make_ids", "code"),
+    ("make_body", "code"),
     [
-        (lambda a, b: [a], "too_few_videos"),
-        (lambda a, b: [a, a], "duplicate_video"),
-        (lambda a, b: [a, "fedcba9876543210fedcba9876543210"], "video_not_found"),
-        (lambda a, b: [a, "../uploads/x"], "video_not_found"),
-        (lambda a, b: [a, "0123456789abcdef0123456789abcde"], "video_not_found"),
+        (lambda a, b: _items_body([a]), "too_few_items"),
+        (lambda a, b: _items_body([]), "no_video"),
+        (lambda a, b: _items_body([a, a]), "duplicate_video"),
+        (lambda a, b: _items_body([a, "fedcba9876543210fedcba9876543210"]), "video_not_found"),
+        (lambda a, b: _items_body([a, "../uploads/x"]), "video_not_found"),
+        (lambda a, b: _items_body([a, "0123456789abcdef0123456789abcde"]), "video_not_found"),
+        (lambda a, b: {"video_ids": [a, b]}, "invalid_request"),
     ],
 )
-def test_invalid_requests_are_rejected_with_422(client, tmp_path, make_ids, code):
+def test_invalid_requests_are_rejected_with_422(client, tmp_path, make_body, code):
     a = upload_id(client, make_video(tmp_path / "a.mp4"))
     b = upload_id(client, make_video(tmp_path / "b.mp4"))
 
-    response = _merge(client, make_ids(a, b))
+    response = client.post("/api/merges", json=make_body(a, b))
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == code
