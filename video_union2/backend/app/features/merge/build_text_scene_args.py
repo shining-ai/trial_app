@@ -23,7 +23,8 @@ def build_text_scene_args(
     fps = f"{output.fps_num}/{output.fps_den}"
     return [
         "ffmpeg", "-y", "-nostdin", "-v", "error", "-xerror",
-        "-protocol_whitelist", "file", "-format_whitelist", "image2", "-f", "image2",
+        # pattern_type none: パスの % を連番の書式として解釈させない
+        "-protocol_whitelist", "file", "-format_whitelist", "image2", "-f", "image2", "-pattern_type", "none",
         "-loop", "1", "-framerate", fps, "-i", str(image_path),
         "-f", "lavfi", "-i", _SILENT_AUDIO,
         "-filter_complex", f"[0:v]setsar=1,fps={fps},format=yuv420p[v]",

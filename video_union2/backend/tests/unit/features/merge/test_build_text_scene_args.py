@@ -23,7 +23,7 @@ def _args(frames=165, seconds=5.5055):
 def test_args_loop_the_png_with_silent_stereo_for_the_given_frames():
     assert _args() == [
         "ffmpeg", "-y", "-nostdin", "-v", "error", "-xerror",
-        "-protocol_whitelist", "file", "-format_whitelist", "image2", "-f", "image2",
+        "-protocol_whitelist", "file", "-format_whitelist", "image2", "-f", "image2", "-pattern_type", "none",
         "-loop", "1", "-framerate", "30000/1001", "-i", str(IMAGE),
         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
         "-filter_complex", "[0:v]setsar=1,fps=30000/1001,format=yuv420p[v]",

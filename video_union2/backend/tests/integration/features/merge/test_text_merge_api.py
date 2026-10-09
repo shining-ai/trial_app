@@ -199,6 +199,11 @@ def test_text_with_quotes_colons_and_expansions_is_drawn_without_reaching_ffmpeg
     files = sorted(str(p.relative_to(settings.storage_dir)) for p in settings.storage_dir.rglob("*") if p.is_file())
     assert [f for f in files if not f.startswith("uploads/")] == [str(result.relative_to(settings.storage_dir))]
     assert is_close(sample_pixel(result, at_seconds=0.5, x=160, y=90), RED)
+    # 記号入りの本文も描画まで通り、テキストの場面に白い文字がある
+    left, top, right, bottom = bright_bbox(result, at_seconds=1.5)
+    # 320x180 の出力で、2行が中央付近の、左右5%(16px)の余白の内側にある
+    assert 16 <= left < 160 < right <= 304 and 60 < top < 90 < bottom < 120, (left, top, right, bottom)
+    assert is_close(sample_pixel(result, at_seconds=1.5, x=0, y=0), BLACK)
 
 
 def test_output_too_small_for_text_is_rejected_before_starting(client, settings, tmp_path):

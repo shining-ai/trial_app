@@ -1,5 +1,6 @@
 from PIL import Image
 
+from app.features.merge.load_scene_font import load_scene_font
 from app.features.merge.render_text_scene import render_text_scene
 from app.lib.config import Settings
 
@@ -47,6 +48,16 @@ def test_japanese_text_is_drawn_inside_the_margins(tmp_path):
 
     assert 32 <= left < 320 < right <= 608
     assert 160 < top < 180 < bottom < 200
+
+
+def test_each_japanese_glyph_differs_from_the_missing_glyph_box(tmp_path):
+    # フォントにない文字(ハングル)は字形のない四角(豆腐)で描かれる。日本語がそれと同じ絵なら字形が使われていない
+    assert ord("한") not in load_scene_font(FONT).code_points
+    missing = _render(tmp_path, ("한",), 640, 360, "missing.png").tobytes()
+    drawn = {c: _render(tmp_path, (c,), 640, 360, f"{ord(c)}.png").tobytes() for c in "あア漢■A"}
+
+    assert {c: image != missing for c, image in drawn.items()} == {c: True for c in "あア漢■A"}
+    assert len(set(drawn.values())) == 5
 
 
 def test_same_text_renders_the_same_image(tmp_path):

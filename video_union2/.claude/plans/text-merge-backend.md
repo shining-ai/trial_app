@@ -170,7 +170,7 @@ MergeSegment = MergeSource | TextScene
 
 ### ログ(Q10)
 
-- テキストの本文はログに出さない。結合の開始・完了・失敗のログに `text_scene_count` を足す
+- テキストの本文はログに出さない。結合の完了・失敗のログに `text_scene_count` を足す(開始のログはもともとない。logging.md 規則5の info の対象にも「開始」は入らないため、足さない。I-2)
 - テキストの場面の作成の失敗(error)には、次を必ず出す(O-2)
   - `err`(例外の型・メッセージ・スタックトレース)
   - `failed_index`(リスト全体での位置)、`failed_kind="text"`
@@ -318,7 +318,7 @@ MergeSegment = MergeSource | TextScene
 - テキストの本文に `'`、`:`、`%{pts}`、`\`、`;` を含めても、結合が成功し、`parts/` の外にファイルができない
 - 22x22 の動画とテキストの場面を結合すると、ジョブを作らずに 422 `output_too_small_for_text`。24x24 なら成功する(B-9)
 - テキストの場面の作成が失敗した場合は `failed` になり、「1番目のテキストの場面の作成に失敗しました」を返し、`parts/`(PNG を含む)・`parts.txt`・`result.partial.mp4` が残らない。失敗は、存在しない preset の設定(`X264_PRESET=invalid`)で [テキストの場面, 動画] を結合して起こす(モックではなく設定で起こす)。error のログに `failed_kind="text"`・`failed_step="encode"`・`failed_index=1`・`err`・`width`・`height` がある(O-2)
-- 結合の開始・完了・失敗のログに `text_scene_count` があり、テキストの本文(テストで使った固有の文字列)がログのどこにも出ない
+- 結合の完了・失敗のログに `text_scene_count` があり、テキストの本文(テストで使った固有の文字列)がログのどこにも出ない
 - 422 で返す経路(😀入り・タブ入り・21文字の行・`type` を誤った項目・`duration_tenths="55"`)と413 のそれぞれのあとで、テキストの本文の固有の文字列がログのどこにも出ない(S-1/O-3)
 
 ## 6. 実装順

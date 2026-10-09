@@ -48,6 +48,20 @@ def test_file_that_is_not_a_font_is_logged_and_reraised(tmp_path, caplog):
     assert "secret-dir" not in json.dumps(errors[0].fields, ensure_ascii=False) + errors[0].getMessage()
 
 
+def test_unreadable_font_is_logged_without_its_path(tmp_path, caplog):
+    caplog.set_level(logging.INFO)
+    # ファイルの代わりにフォルダを指すと、開くときに OSError になり、その文言には通常パスが入る
+    directory = tmp_path / "secret-dir" / "font.ttf"
+    directory.mkdir(parents=True)
+
+    with pytest.raises(Exception):
+        load_scene_font(directory)
+
+    errors = _font_errors(caplog)
+    assert len(errors) == 1
+    assert "secret-dir" not in json.dumps(errors[0].fields, ensure_ascii=False) + errors[0].getMessage()
+
+
 def test_app_does_not_start_when_the_font_is_missing(settings, make_client, tmp_path):
     with pytest.raises(FileNotFoundError):
         make_client(settings, scene_font_path=tmp_path / "nothing.ttf")

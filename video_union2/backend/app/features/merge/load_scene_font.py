@@ -28,8 +28,12 @@ def load_scene_font(path: Path) -> SceneFont:
     try:
         if not path.is_file():
             raise FileNotFoundError(f"{_SETTING} のフォントファイルが見つかりません")
-        with TTFont(path, lazy=True) as font:
-            cmap = font.getBestCmap()
+        try:
+            with TTFont(path, lazy=True) as font:
+                cmap = font.getBestCmap()
+        except Exception as e:
+            # OSError などの文言にはパスが入るため、型だけを残した例外に置き換える(元の例外は連鎖させない)
+            raise ValueError(f"{_SETTING} のフォントを読み込めません({type(e).__name__})") from None
         if not cmap:
             raise ValueError(f"{_SETTING} のフォントに文字の表がありません")
     except Exception as e:

@@ -74,6 +74,17 @@ def test_text_scene_durations_are_summed_in_whole_milliseconds():
     assert _check_segments([_src(1, 600.1), _src(2, 600.2), _text(5998)])[1] == "too_long"
 
 
+def test_text_scene_length_is_counted_after_rounding_to_whole_frames_of_the_output():
+    one_fps = MergeSource(video_id="a" * 32, file_name="a.mp4", size_bytes=1, duration_seconds=1.0, width=640,
+                          height=360, fps_num=1, fps_den=1, has_audio=True, video_stream_index=0, audio_stream_index=1)
+    limit = Settings(max_total_seconds=4)
+
+    # 指定どおりなら 1 + 1.5 + 1.5 = 4.0 秒だが、1fps では 1.5 秒が 2 フレーム(2.0 秒)になり 5.0 秒
+    assert _check_segments([one_fps, _text(15), _text(15)], settings=limit) == (
+        422, "too_long", "結合後の長さが0分を1秒超えています")
+    assert _check_segments([one_fps, _text(10), _text(20)], settings=limit) is None
+
+
 def test_text_scene_needs_an_output_whose_short_side_is_at_least_23_pixels():
     message = "動画の解像度が小さすぎて、テキストの場面を表示できません(出力の短い辺が23ピクセル以上必要です)"
 
