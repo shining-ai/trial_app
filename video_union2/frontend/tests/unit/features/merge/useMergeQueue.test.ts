@@ -561,3 +561,97 @@ test("位置のエラーは、入力欄を取り消すと消え、失敗した i
   });
   expect(ids(result)).toEqual(["a", "text-1"]);
 });
+
+test("アップロードが届いた直後(画面に反映される前)に確定しても、届いた動画は一覧から消えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+
+  act(() => {
+    result.current.addItem(video("c", 1));
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a", "b", "text-1", "c"]);
+});
+
+test("削除の失敗で動画が戻った直後(画面に反映される前)に確定しても、戻った動画は一覧から消えない", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a", "b", "text-1"]);
+});
+
+test("削除の完了を待つ間に先頭へ見出しを挿入し、削除が失敗しても、見出しは先頭のまま", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("オープニング", 30);
+  });
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["text-1", "a", "b", "c"]);
+});
+
+test("削除の完了を待つ間に並べ替えても、削除が失敗した動画は元の直後の項目の前に戻る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.move(1, "top");
+  });
+  expect(ids(result)).toEqual(["c", "b"]);
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});

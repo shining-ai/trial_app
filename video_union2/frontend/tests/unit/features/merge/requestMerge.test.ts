@@ -55,7 +55,10 @@ test("動画とテキストの場面が、渡した並び順どおりに API の
 
 test.each([
   ["unsupported_characters", "2番目のテキストの場面: 表示できない文字が含まれています: 한"],
-  ["output_too_small_for_text", "出力が小さすぎてテキストの場面を描けません"],
+  [
+    "output_too_small_for_text",
+    "動画の解像度が小さすぎて、テキストの場面を表示できません(出力の短い辺が23ピクセル以上必要です)",
+  ],
   ["invalid_text_scene", "1番目のテキストの場面: 1行は20文字までです(1行目が21文字)"],
 ])("422 %s のときはサーバーの message を持つ ApiError で失敗する", async (code, message) => {
   vi.stubGlobal(

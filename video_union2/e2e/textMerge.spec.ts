@@ -52,7 +52,8 @@ test("動画の間に挿入した見出しが、黒背景に白文字の場面�
 
   const [first, middle, last] = colorsAt(saved, [0.5, 1.5, 2.5]);
   expect([isCloseColor(first, RED), isCloseColor(middle, WHITE), isCloseColor(last, BLUE)]).toEqual([true, true, true]);
-  expect(isCloseColor(samplePixel(saved, 1.5, 0, 0), BLACK)).toBe(true);
+  const corners = [[0, 0], [318, 0], [0, 178], [318, 178]].map(([x, y]) => samplePixel(saved, 1.5, x, y));
+  expect(corners.map((c) => isCloseColor(c, BLACK))).toEqual([true, true, true, true]);
   expect(Math.abs(probeVideo(saved).durationSeconds - 3)).toBeLessThanOrEqual(TOLERANCE);
   expect(decodesToEnd(saved)).toEqual({ ok: true, stderr: "" });
 });
