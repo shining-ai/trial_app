@@ -580,6 +580,28 @@ test("アップロードが届いた直後(画面に反映される前)に確定
   expect(ids(result)).toEqual(["a", "b", "text-1", "c"]);
 });
 
+test("アップロードが届いた直後(画面に反映される前)に編集を確定しても、届いた動画は一覧から消えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+
+  act(() => {
+    result.current.addItem(video("b", 1));
+    result.current.confirmText("直した見出し", 50);
+  });
+
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+  expect(textOf(result.current.items[1])).toEqual({ text: "直した見出し", durationTenths: 50 });
+});
+
 test("削除の失敗で動画が戻った直後(画面に反映される前)に確定しても、戻った動画は一覧から消えない", async () => {
   const control = pendingDelete();
   const { result } = renderHook(() => useMergeQueue());
