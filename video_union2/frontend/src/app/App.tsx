@@ -5,7 +5,7 @@ import { MergeProgress } from "../features/merge/MergeProgress";
 import { MergeSummary } from "../features/merge/MergeSummary";
 import { useMergeJob } from "../features/merge/useMergeJob";
 import { useMergeQueue } from "../features/merge/useMergeQueue";
-import { VideoOrderList } from "../features/merge/VideoOrderList";
+import { MergeOrderList } from "../features/merge/MergeOrderList";
 import { UploadForm } from "../features/upload/UploadForm";
 import { UploadList } from "../features/upload/UploadList";
 import { useUploadQueue } from "../features/upload/useUploadQueue";
@@ -37,12 +37,18 @@ export function App() {
         <UploadList items={uploadQueue.items} />
       </section>
       <section aria-label="結合">
-        <VideoOrderList
+        <MergeOrderList
           items={mergeQueue.items}
+          editor={mergeQueue.editor}
+          editorError={mergeQueue.editorError}
           disabled={mergeJob.isMerging}
           deleteError={mergeQueue.deleteError}
           onMove={mergeQueue.move}
           onRemove={(id) => void mergeQueue.removeItem(id)}
+          onOpenInsert={mergeQueue.openInsert}
+          onOpenEdit={mergeQueue.openEdit}
+          onConfirmText={mergeQueue.confirmText}
+          onCloseEditor={mergeQueue.closeEditor}
         />
         <MergeSummary totalSeconds={mergeQueue.totalSeconds} excessSeconds={check.excessSeconds} />
         <MergeButton
