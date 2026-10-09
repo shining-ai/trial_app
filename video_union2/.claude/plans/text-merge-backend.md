@@ -53,10 +53,11 @@
 | `invalid_text_scene` | テキストの検証に失敗 | 2番目のテキストの場面: 1行は20文字までです(3行目が23文字) |
 | `unsupported_characters` | フォントにない文字・改行以外の制御文字 | 2番目のテキストの場面: 表示できない文字が含まれています: 😀 タブ |
 | `too_long` | 合計が30分を超える | 結合後の長さが30分を1秒超えています(今と同じ) |
+| `output_too_small_for_text` | テキストの場面があり、出力の短い辺が23ピクセル未満(B-9) | 動画の解像度が小さすぎて、テキストの場面を表示できません(出力の短い辺が23ピクセル以上必要です) |
 
 - 番号は「何番目のテキストの場面か」ではなく「リスト全体での位置」で数える(Q11)。画面の行の番号と一致させるため
 - 原因の文字は重複を除いて最初の5つまで並べる。制御文字は名前で示す(タブ、復帰など。それ以外は `U+0007` の形)
-- 確認の順番: 本文の大きさ → 形 → 本数・重複(`validate_merge_items`) → テキストの場面(リストの前から順に、最初の失敗を返す) → 動画のメタ情報の読み出し → 合計の長さと空き容量。メタ情報を読む前に、安く確かめられるものを先に確かめる(video-merge の I17 と同じ考え方)
+- 確認の順番: 本文の大きさ → 形 → 本数・重複・表示時間(`validate_merge_items`) → テキストの場面の正規化(`normalize_text_items`。リストの前から順に、最初の失敗を返す) → 動画のメタ情報の読み出し → 合計の長さ・テキストの場面を描ける出力サイズか・空き容量(`validate_merge_request`)。メタ情報を読む前に、安く確かめられるものを先に確かめる(video-merge の I17 と同じ考え方)
 
 ### テキストの正規化と検証(`normalize_scene_text.py`、純粋関数)
 
@@ -64,21 +65,40 @@
 
 1. `\r\n` を `\n` にそろえる
 2. NFC で正規化する(Q7)
-3. 前後の空白(全角空白を含む。Python の `str.strip()`)を取り除く。これで先頭・末尾の空行も消える
-4. 空なら「テキストを入力してください」
-5. 改行以外の制御文字(Unicode の分類 `Cc`)と書式文字(`Cf`。幅のない空白や文字の向きを変える文字)があれば `unsupported_characters`
+3. 改行以外の制御文字(Unicode の分類 `Cc`)と書式文字(`Cf`。幅のない空白、U+FEFF、文字の向きを変える文字)があれば `unsupported_characters`。**取り除く処理より前に確かめる**ので、先頭・末尾のタブも拒否される(B-1、FR-004a)
+4. 前後の「半角空白(U+0020)・全角空白(U+3000)・改行」だけを取り除く。`str.strip()` は使わない(タブや U+001C〜001F、U+0085 まで取り除き、画面の `trim()` と取り除く文字が食い違うため。B-1)。これで先頭・末尾の空行も消える
+5. 空なら「テキストを入力してください」
 6. フォントにない文字(空白類を除く)があれば `unsupported_characters`(Q5)
 7. 行に分ける。6行以上なら「5行までです(6行あります)」
 8. 1行が21文字以上なら「1行は20文字までです(3行目が23文字)」
 9. 改行を除いて101文字以上なら「全体で100文字までです(101文字あります)」(1行20文字・5行の上限の下では起きないが、要件の上限として確かめる)
 10. 各行の行末の空白は取り除かない(利用者の入力どおりに描く)
 
-文字数は NFC のあとのコードポイント数で数える(Python の `len`)。画面(プラン2)も `[...text.normalize("NFC")].length` で同じ数え方にする。
+文字数は NFC のあとのコードポイント数で数える(Python の `len`)。画面(プラン2)も `[...text.normalize("NFC")].length` で同じ数え方にする。取り除く文字の集合と、拒否する分類(`Cc` のうち改行以外、`Cf`)も、画面と同じにする(B-1)。
+
+### テキストの場面の列の検証(`normalize_text_items.py`、純粋関数。D-1)
+
+入力: `items` とフォントにある文字の集合。出力: 「リストでの位置 → `TextScene`」の対応、または失敗(code と、番号付きの message)。
+
+- `items` を前から順に見て、テキストの場面ごとに `normalize_scene_text` を呼び、最初の失敗で止める
+- message の頭に「{リスト全体での位置}番目のテキストの場面: 」を付ける(Q11)。番号の数え方をこの関数の単体テストで確かめる
+- `start_merge` はこの関数を呼ぶだけにする(判断と変換を、前回の結果の削除やジョブの開始と同じファイルに書かない)
+
+### 入力の列の組み立て(`build_merge_segments.py`、純粋関数。D-1)
+
+入力: `items`、テキストの場面の対応、読み出した動画の `MergeSource` の列。出力: リストの順の `MergeSegment` の列。
 
 ### 表示時間(`validate_merge_items.py` の中)
 
-- `duration_tenths` が10未満、または600を超えたら `invalid_text_scene`「表示時間は1秒から60秒までで指定してください」
-- 合計の長さは、動画は今と同じくミリ秒に丸めて足し、テキストの場面は `duration_tenths * 100` ミリ秒を足す(`validate_merge_request` の計算を拡張する。画面の `sumDurationMilliseconds` と同じ値になる)
+- `duration_tenths` が10未満、または600を超えたら `invalid_text_scene`「{n}番目のテキストの場面: 表示時間は1秒から60秒までで、小数第1位まで指定してください」(画面と同じ文言。B-8)
+- 合計の長さは、動画は今と同じくミリ秒に丸めて足し、テキストの場面は `duration_tenths * 100` ミリ秒を足す(`validate_merge_request` の計算を拡張する。画面の `sumMergeItemsMilliseconds` と同じ値になる)
+- 超過の時間の文言は今の `format_excess`(秒に切り上げ)のまま。画面も同じ `formatExcess` で出すので、1790秒 + 10.1秒なら画面もサーバーも「…30分を1秒超えています」になる(B-8)
+
+### テキストの場面を描ける出力サイズか(`validate_merge_request.py` の中。B-9)
+
+- テキストの場面が1つ以上あり、`plan_output_format` で決まる出力の短い辺が23ピクセル未満(フォントの大きさが1未満になる)なら、ジョブを作らずに 422 `output_too_small_for_text` を返す
+- 202 を返したあとにジョブの中で失敗させない(利用者に理由が伝わらないため)
+- 要件定義の既知の制限に、この条件を書き足した
 
 ### 文字の配置(`layout_text_scene.py`、純粋関数)
 
@@ -89,7 +109,8 @@
 - 行の高さ: フォントの大きさの1.5倍。5行で 7.5em(短い辺の約34%)に収まる
 - 縦: 行のかたまり全体を、出力の上下の中央に置く。横: 行ごとに左右の中央に置く
 - 余白: どの行の幅も「出力の幅 − 左右の5%ずつ」を超えたら `ValueError`(IPAexゴシックでは全角が最も広く、20文字で90%ちょうどになるため、本来は起きない。起きたら描かずに失敗にする)
-- 出力が小さくてフォントの大きさが1未満になる場合(短い辺が22ピクセル以下)も `ValueError`(アップロードに解像度の下限はない。要件の既知の制限の範囲外で、描けないものは失敗にする)
+- フォントの大きさが1未満になる場合(短い辺が22ピクセル以下)も `ValueError`。受け付ける前に `output_too_small_for_text` で拒否するので、ここは念のための守り
+- `ValueError` のメッセージには、行番号・ピクセル数・出力の幅と高さだけを入れ、行の中身を入れない(ログの `err` に載るため。S-1/O-3)
 
 ### 文字の描画(`render_text_scene.py`)
 
@@ -102,6 +123,7 @@
 
 - 設定 `scene_font_path`(環境変数 `SCENE_FONT_PATH`、既定は IPAexゴシックのパス。実際のパスは導入時に `dpkg -L fonts-ipaexfont-gothic` で確かめて既定値にする)
 - 起動時(`main.py` の lifespan)にフォントを読み、fontTools でフォントにある文字の集合(cmap)を作って `app.state.scene_font` に持つ。ファイルがない・読めないときは起動を失敗させる(testing.md「足りなければ失敗させる」)
+- 読み込みに失敗したら、logger.py 経由で error を記録してから再送出し、起動を止める(O-1。logging.md 規則2・3)。記録するのは `name="merge.load_scene_font"`、`err`、`setting="SCENE_FONT_PATH"`。パスの値は記録しない(環境変数の値を出さないため)。成功は記録しない(1秒を超えたときだけ info と `ms`)
 - merge だけが使うため、`lib/` ではなく `features/merge/` に置く(architecture.md の問い1)
 
 ### 1段目: テキストの場面の中間ファイル(`build_text_scene_args.py`、純粋関数)
@@ -139,7 +161,7 @@ MergeSegment = MergeSource | TextScene
 
 ### ジョブの流れの変更(`start_merge.py`、`run_merge_job.py`)
 
-- `start_merge` は `items` を受け取り、上の順に確かめてから、リストの順の `MergeSegment` の列を作る
+- `start_merge` は `items` を受け取り、上の順に確認の関数を呼び、`build_merge_segments` でリストの順の `MergeSegment` の列を作る。自分では判断や変換をしない(D-1)
 - `plan_output_format` には動画(`MergeSource`)だけを渡す。テキストの場面は出力の大きさと fps を決める計算に入れない(FR-009)
 - `run_merge_job` は `MergeSegment` の列を前から順に処理する。動画は今と同じ。テキストの場面は「PNG を描く → `build_text_scene_args` で中間ファイルを作る」。PNG は `parts/` の中に置くので、成功・失敗のどちらでも今の後片付け(`parts/` ごと消す)で消える
 - 失敗したら、テキストの場面なら「{n}番目のテキストの場面の作成に失敗しました」(Q11)。動画は今の文言のまま。番号はどちらもリスト全体での位置
@@ -148,8 +170,16 @@ MergeSegment = MergeSource | TextScene
 
 ### ログ(Q10)
 
-- テキストの本文はログに出さない。結合の開始・完了・失敗のログに `text_scene_count` を足し、テキストの場面の失敗では `failed_index`、`failed_kind="text"`、`line_count`、`char_count` を出す
+- テキストの本文はログに出さない。結合の開始・完了・失敗のログに `text_scene_count` を足す
+- テキストの場面の作成の失敗(error)には、次を必ず出す(O-2)
+  - `err`(例外の型・メッセージ・スタックトレース)
+  - `failed_index`(リスト全体での位置)、`failed_kind="text"`
+  - `failed_step`: `"layout"`(配置の `ValueError`)、`"render"`(Pillow の描画・PNG の書き込み)、`"encode"`(FFmpeg)のどれか
+  - 出力の `width`・`height`、`line_count`、`char_count`
 - `run_process` は失敗時に引数を記録するが、テキストの場面の引数に入るのは PNG のパスだけなので、本文は漏れない
+- **ジョブを作らずに返す経路(413・422)でも、本文を記録しない**(S-1/O-3)
+  - 413・422(`invalid_request`・`invalid_text_scene`・`unsupported_characters`・`output_too_small_for_text` を含む)は記録しない(今の `errors.py` の扱いどおり)
+  - pydantic の `ValidationError` の中身(入力値を含む)と、原因の文字を含む message を、ログに渡さない
 
 ### バックエンドのファイル
 
@@ -161,21 +191,23 @@ MergeSegment = MergeSource | TextScene
 | `app/features/merge/merge_segment.py` | 結合の入力(動画またはテキストの場面)の型を定める | 新規 |
 | `app/features/merge/validate_merge_items.py` | メタ情報を読む前に、本数・重複・表示時間を確かめる | 新規(`validate_merge_request.validate_video_ids` を移して拡張する) |
 | `app/features/merge/normalize_scene_text.py` | テキストを正規化し、行に分けて検証する | 新規 |
-| `app/features/merge/validate_merge_request.py` | 合計の長さと空き容量を確かめる | テキストの場面の長さを合計に足す |
+| `app/features/merge/normalize_text_items.py` | `items` のテキストの場面を前から順に正規化し、位置と `TextScene` の対応か、番号付きの失敗を返す | 新規(D-1) |
+| `app/features/merge/build_merge_segments.py` | `items` の並びに沿って、動画の `MergeSource` とテキストの場面から `MergeSegment` の列を作る | 新規(D-1) |
+| `app/features/merge/validate_merge_request.py` | メタ情報を読んだあとに、合計の長さ・テキストの場面を描ける出力サイズか・空き容量を確かめる | テキストの場面の長さを合計に足し、出力サイズの確認を足す(B-9) |
 | `app/features/merge/layout_text_scene.py` | 出力サイズと行の幅から、文字の大きさと行の位置を決める | 新規 |
 | `app/features/merge/render_text_scene.py` | テキストの場面を PNG に描く | 新規 |
 | `app/features/merge/load_scene_font.py` | フォントを読み、フォントにある文字の集合を作る | 新規 |
 | `app/features/merge/build_encode_args.py` | 中間ファイルのエンコーダーの引数(映像・音声)を返す | 新規(`build_normalize_args` から切り出す) |
 | `app/features/merge/build_text_scene_args.py` | PNG からテキストの場面の中間ファイルを作る FFmpeg の引数を組み立てる | 新規 |
 | `app/features/merge/build_normalize_args.py` | 1本の動画を出力の形式に揃える引数を組み立てる | エンコーダーの引数を `build_encode_args` から取る |
-| `app/features/merge/start_merge.py` | 確認 → 前回の結果の削除 → ジョブの開始 | `items` を受け取り、`MergeSegment` の列を作る |
+| `app/features/merge/start_merge.py` | 確認 → 前回の結果の削除 → ジョブの開始 | `items` を受け取り、確認の関数と `build_merge_segments` を呼ぶ |
 | `app/features/merge/run_merge_job.py` | 中間ファイルを順に作ってつなぎ、状態を更新する | テキストの場面の分岐と失敗の文言 |
 | `app/lib/disk_storage.py` | 保存先のパスを種類ごとに返す | `merge_text_image_path` を足す |
 | `app/lib/config.py` | 設定を環境変数から読む | `scene_font_path` を足す |
 | `app/main.py` | アプリを組み立てる | lifespan でフォントを読む |
 | `Dockerfile` | backend のイメージ | `fonts-ipaexfont-gothic` を入れる |
 | `pyproject.toml` | 依存 | `pillow`、`fonttools` を固定の版で足す(導入時点の最新の安定版) |
-| `frontend/src/features/merge/requestMerge.ts` | 結合を依頼する | 本文を `items`(動画だけ)の形にする。プラン2で引数を結合リストの項目に広げる |
+| `frontend/src/features/merge/requestMerge.ts` | 結合を依頼する(API の本文の形への変換もここだけで行う) | 引数(動画の ID の列)はそのままで、中で `items`(動画だけ)の形にする。プラン2で引数を `MergeItem[]` に広げ、変換を `toMergeRequestItems` に分けるが、呼ぶのは引き続き `requestMerge` だけ(D-2) |
 
 ## 4. テスト影響範囲
 
@@ -209,19 +241,31 @@ MergeSegment = MergeSource | TextScene
 - 「𠮷」(サロゲートペアになる文字)を20個並べた行は許可(1文字と数える)
 - 5行 × 20文字(改行を除いて100文字)は許可
 - タブ・U+0007・幅のない空白(U+200B)・文字の向きを変える文字(U+202E)を含むと `unsupported_characters` で、文字の名前(タブ)または `U+0007` の形で示す
+- 先頭・末尾のタブ(`"\t京都"`、`"京都\t"`)も `unsupported_characters`(取り除かれて受け付けられない。B-1)
+- 先頭の U+FEFF、末尾の U+0085 も `unsupported_characters`(画面と同じ判定になる。B-1)
 - フォントの集合にない文字(😀)を含むと `unsupported_characters` で「😀」を示す。同じ文字が何度あっても1回だけ示し、最大5つまで示す
 - 空白(半角・全角)はフォントの集合になくても拒否しない
+
+**`test_normalize_text_items.py`**(D-1)
+- [動画, テキスト(21文字の行), テキスト(😀)] → 最初の失敗だけを返し、message が「2番目のテキストの場面: 1行は20文字までです(1行目が21文字)」
+- [テキスト, 動画, テキスト] がすべて正しい → 位置0と2の `TextScene` を返す
+- テキストの場面がない → 空の対応
+
+**`test_build_merge_segments.py`**(D-1)
+- [テキスト, 動画A, テキスト, 動画B] と対応・`MergeSource` から、同じ順の `MergeSegment` の列を作る
 
 **`test_validate_merge_items.py`**
 - 動画2本 → 許可。動画1本 + テキストの場面1つ → 許可。テキストの場面 → 動画 → テキストの場面 → 許可
 - 動画1本だけ → `too_few_items`。空のリスト → `no_video`。テキストの場面2つだけ → `no_video`
 - 動画100本 + テキストの場面5つ → 許可。動画101本 → `too_many_videos`(本当の上限値で確かめる)
 - 同じ動画が2回 → `duplicate_video`。同じ文言のテキストの場面が2つ → 許可
-- 表示時間 10 と 600 は許可、9 と 601 は `invalid_text_scene`「…表示時間は1秒から60秒までで指定してください」。番号はリスト全体での位置(動画 → テキストの場面なら「2番目」)
+- 表示時間 10 と 600 は許可、9 と 601 は `invalid_text_scene`「…表示時間は1秒から60秒までで、小数第1位まで指定してください」(画面と同じ文言。B-8)。番号はリスト全体での位置(動画 → テキストの場面なら「2番目」)
 
 **`test_validate_merge_request.py`**(既存に追加)
 - 動画 1790.000 秒 + テキストの場面 100(10.0秒)= 1800.000 秒は許可、テキストの場面が 101 なら `too_long` と「…30分を1秒超えています」
 - 動画 [600.1, 600.2] + テキストの場面 5997(599.7秒)は許可(ミリ秒に丸めた合計で比べる)
+- 動画 1790.000 秒 + テキストの場面 101(10.1秒)の message は「結合後の長さが30分を1秒超えています」(画面と同じ。B-8)
+- テキストの場面があり出力が 22x22 → `output_too_small_for_text`。24x24 → 許可。テキストの場面がなければ 22x22 でも許可(B-9)
 
 **`test_layout_text_scene.py`**
 - 1920x1080・1080x1920 → フォントの大きさ 48、640x360 → 16
@@ -254,7 +298,8 @@ MergeSegment = MergeSource | TextScene
 
 **`test_load_scene_font.py`**
 - 既定のフォントを読むと、「あ」「漢」「■」「A」のコードポイントが集合にあり、「😀」がない
-- 存在しないパスを指定してアプリを起動すると、起動が失敗する
+- 存在しないパスを指定してアプリを起動すると、起動が失敗し、error のログに `name="merge.load_scene_font"`・`err`・`setting="SCENE_FONT_PATH"` があり、パスの値がない(O-1)
+- フォントでないファイル(テキストファイル)を指定しても、同じく記録してから起動が失敗する
 
 **`test_merge_api.py`**(既存に追加)
 - 赤(1秒)・テキストの場面「■」(1.0秒)・青(1秒)を結合すると、0.5秒の中央が赤、1.5秒の中央が白・四隅が黒、2.5秒の中央が青。出力の長さは3秒 ± (1フレーム + 0.03秒)(SC-001・SC-002)
@@ -271,8 +316,10 @@ MergeSegment = MergeSource | TextScene
 - 本文が1MBを超えると413 `request_too_large`
 - `"video_ids"` だけの古い形の本文は 422 `invalid_request`
 - テキストの本文に `'`、`:`、`%{pts}`、`\`、`;` を含めても、結合が成功し、`parts/` の外にファイルができない
-- テキストの場面の作成が失敗した場合(描けない 16x16 の出力: 16x16 の動画とテキストの場面を結合する)は `failed` になり、「2番目のテキストの場面の作成に失敗しました」を返し、`parts/`(PNG を含む)・`parts.txt`・`result.partial.mp4` が残らない
+- 22x22 の動画とテキストの場面を結合すると、ジョブを作らずに 422 `output_too_small_for_text`。24x24 なら成功する(B-9)
+- テキストの場面の作成が失敗した場合は `failed` になり、「1番目のテキストの場面の作成に失敗しました」を返し、`parts/`(PNG を含む)・`parts.txt`・`result.partial.mp4` が残らない。失敗は、存在しない preset の設定(`X264_PRESET=invalid`)で [テキストの場面, 動画] を結合して起こす(モックではなく設定で起こす)。error のログに `failed_kind="text"`・`failed_step="encode"`・`failed_index=1`・`err`・`width`・`height` がある(O-2)
 - 結合の開始・完了・失敗のログに `text_scene_count` があり、テキストの本文(テストで使った固有の文字列)がログのどこにも出ない
+- 422 で返す経路(😀入り・タブ入り・21文字の行・`type` を誤った項目・`duration_tenths="55"`)と413 のそれぞれのあとで、テキストの本文の固有の文字列がログのどこにも出ない(S-1/O-3)
 
 ## 6. 実装順
 
@@ -280,10 +327,10 @@ MergeSegment = MergeSource | TextScene
 |---|---|---|---|
 | 1 | `Dockerfile` へのフォントの導入、`pyproject.toml` への `pillow`・`fonttools` の追加、`config.py` の `scene_font_path`、`disk_storage.merge_text_image_path`、補助関数 `tests/support/bright_bbox.py` | Haiku のサブエージェント | 定型作業。フォントの実際のパスを `dpkg -L` で確かめて既定値にする。`bright_bbox` には単色・白い四角の動画で確かめるテストを付ける |
 | 2 | `normalize_scene_text.py` | Sonnet のサブエージェント | 正規化の手順と境界値がこのプランで確定している |
-| 3 | `merge_segment.py`、`schemas.py`、`validate_merge_items.py`、`validate_merge_request.py` の拡張 | メイン(Opus) | API の形と確認の順番を決める |
-| 4 | `load_scene_font.py`、`layout_text_scene.py`、`render_text_scene.py` と `main.py` の lifespan | メイン(Opus) | 文字の大きさと配置、フォントの扱い。描画の結合テストを含む |
+| 3 | `merge_segment.py`、`schemas.py`、`validate_merge_items.py`、`normalize_text_items.py`、`build_merge_segments.py`、`validate_merge_request.py` の拡張(出力サイズの確認を含む) | メイン(Opus) | API の形と確認の順番を決める |
+| 4 | `load_scene_font.py`(失敗の記録を含む)、`layout_text_scene.py`、`render_text_scene.py` と `main.py` の lifespan | メイン(Opus) | 文字の大きさと配置、フォントの扱い。描画の結合テストを含む |
 | 5 | `build_encode_args.py` の切り出し、`build_text_scene_args.py` | メイン(Opus) | 2段目の `-c copy` でつながる形式にそろえる。フレーム数の丸め |
-| 6 | `read_limited_body.py`、`router.py`、`start_merge.py`、`run_merge_job.py`、ログ | メイン(Opus) | 失敗の文言・後片付け・本文を記録しないこと |
+| 6 | `read_limited_body.py`、`router.py`、`start_merge.py`、`run_merge_job.py`、ログ | メイン(Opus) | 失敗の文言・後片付け・`failed_step` の記録・本文を記録しないこと(413・422 の経路を含む) |
 | 7 | 既存テストの本文の書き換え(`test_merge_api.py`、`test_download_api.py`)と `requestMerge.ts`・`requestMerge.test.ts` | Sonnet のサブエージェント | 期待値は変えずに本文の形だけを直す。タスク3の直後に行い、既存のテストを壊したままにしない |
 | 8 | 手動確認: 実際の縦長・横長の動画にテキストの場面を挟み、文字が読めること、つなぎ目で音が途切れたり映像が乱れたりしないことを見る | ユーザー | review.md「静的レビューの限界」。API は `curl` で呼ぶ(画面はプラン2) |
 | 9 | レビュー | `design-reviewer`、`edge-case-reviewer`、`security-reviewer` を並列 | security-reviewer には差分を渡す。テキストが FFmpeg の引数・パス・ログに届かないことを重点的に見てもらう |

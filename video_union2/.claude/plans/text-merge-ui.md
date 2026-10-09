@@ -8,7 +8,7 @@
 
 - 各行の「この後にテキストを挿入」と、リストの先頭の「先頭にテキストを挿入」で、その位置に入力欄を開く(Q12)
 - 入力欄は複数行のテキストと表示時間(秒、小数第1位まで)。「確定」でリストに入り、「取り消し」で閉じる(Q13)
-- 画面でも、サーバーと同じ規則でテキストと表示時間を確かめる。フォントにない文字だけはサーバーが判定し、結合ボタンを押したときに 422 の理由を表示する(Q5)
+- 画面でも、サーバーと同じ規則でテキストと表示時間を確かめる。絵文字(絵文字として表示される文字)は画面でも確定の時点で拒否する(B-2)。それ以外のフォントにない文字はサーバーが判定し、結合ボタンを押したときに 422 の理由を表示する(Q5)
 - 合計の長さにテキストの場面の表示時間を含める。テキストの場面はアップロードの本数の枠に数えない
 
 ## 2. 背景
@@ -35,13 +35,14 @@
 ```
 
 - 入力欄は、挿入なら押した行のすぐ下(先頭なら一覧の上)に、編集ならその行の位置に開く。同時に開ける入力欄は1つだけ。別の入力欄を開こうとしたら、今の入力欄を閉じずにそのボタンを押せなくする
+- 入力欄が開いている間は、並べ替えと削除のボタンも押せない(B-3。入力中に並びが変わって、意図と違う位置に入るのを防ぐ)
 - 入力中は、行数と文字数(改行を除く)を「2/5行、4/100文字」と表示する
 - 「確定」で検証し、だめなら入力欄の下に理由を表示してリストには入れない。表示時間の欄も同じ
 - 表示時間の欄の初期値は「3.0」(新規)、または今の値(編集)
 - テキストの場面の行は「📝 {1行目}(3.0秒)」。2行以上なら1行目の後に「…」を付ける(Q15)。読み上げ用のラベルは「テキストの場面: {1行目}」。並べ替え・編集・削除のボタンの `aria-label` は「テキストの場面: {1行目} を上へ」などにする
 - 結合中は、挿入・編集・削除・並べ替えのボタンをすべて押せない(Q14)
 - 入力欄が開いている間は、結合ボタンを押せず「テキストの入力を確定するか取り消してください」と表示する(Q14)
-- サーバーが `invalid_text_scene`・`unsupported_characters` を返したら、今の 422 と同じく、ボタンの横にサーバーの `message` を表示する(「2番目のテキストの場面: 表示できない文字が含まれています: 😀」)
+- サーバーが `invalid_text_scene`・`unsupported_characters`・`output_too_small_for_text` を返したら、今の 422 と同じく、ボタンの横にサーバーの `message` を表示する(「2番目のテキストの場面: 表示できない文字が含まれています: 한」)
 
 ### 型(`types.ts`)
 
@@ -57,38 +58,51 @@ export type MergeItem = VideoItem | TextSceneItem;
 ### 純粋関数
 
 **`normalizeSceneText.ts`**: サーバーの `normalize_scene_text` と同じ手順(フォントにない文字の判定を除く)
-1. `\r\n` を `\n` にそろえる → `normalize("NFC")` → 前後の空白を取り除く(`trim()`。全角空白を含む)
-2. 空 → 「テキストを入力してください」
-3. 改行以外の制御文字(`\p{Cc}`)・書式文字(`\p{Cf}`)→「表示できない文字が含まれています: タブ」(サーバーと同じ書き方)
-4. 6行以上 → 「5行までです(6行あります)」
-5. 21文字以上の行 → 「1行は20文字までです(1行目が21文字)」
-6. 改行を除いて101文字以上 → 「全体で100文字までです(101文字あります)」
-7. 文字数は `[...line].length`(コードポイント数。Q7)
-8. 戻り値は `{ ok: true, text, lineCount, charCount } | { ok: false, message }`
+1. `\r\n` を `\n` にそろえる → `normalize("NFC")`
+2. 改行以外の制御文字(`\p{Cc}`)・書式文字(`\p{Cf}`)→「表示できない文字が含まれています: タブ」(サーバーと同じ書き方)。**取り除く処理より前に確かめる**ので、先頭・末尾のタブや U+FEFF も拒否される(B-1)
+3. 絵文字として表示される文字(`\p{Emoji_Presentation}` と、絵文字の表示を選ぶ U+FE0F)→「表示できない文字が含まれています: 😀」(B-2)。© や ™ のように、文字として表示されるものは拒否しない(フォントにあるかはサーバーが判定する)
+4. 前後の「半角空白(U+0020)・全角空白(U+3000)・改行」だけを取り除く(`/^[ \u3000\n]+|[ \u3000\n]+$/g`)。`trim()` は使わない(U+FEFF などまで取り除き、サーバーと取り除く文字が食い違うため。B-1)
+5. 空 → 「テキストを入力してください」
+6. 6行以上 → 「5行までです(6行あります)」
+7. 21文字以上の行 → 「1行は20文字までです(1行目が21文字)」
+8. 改行を除いて101文字以上 → 「全体で100文字までです(101文字あります)」
+9. 文字数は `[...line].length`(コードポイント数。Q7)
+10. 戻り値は `{ ok: true, text, lineCount, charCount } | { ok: false, message }`
+
+絵文字の拒否(手順3)は画面だけの早めの確認で、サーバーではフォントの文字の集合で同じ文字が拒否される。画面とサーバーで拒否する理由の文言は同じになる。
 
 **`parseSceneDuration.ts`**: 表示時間の欄の文字列 → 0.1秒単位の整数
 - `^\d{1,2}(\.\d)?$` に合う文字列だけを受け付ける(前後の空白は取り除く)。`"5.5"` → 55、`"3"` → 30、`"60"` → 600、`"1.0"` → 10
 - 範囲外(10未満・600超)、数字でない、小数第2位以下がある(`"5.55"`)、指数表記(`"1e1"`)、空 → 「表示時間は1秒から60秒までで、小数第1位まで指定してください」
 - 浮動小数を経由しない(`"5.5"` を `5 * 10 + 5` で数える)
 
-**`insertItem.ts`**: 指定の位置の後(`-1` なら先頭)に項目を入れた新しい配列を返す
+**`insertItemAfter.ts`**: 指定の id の項目の後(`null` なら先頭)に項目を入れた新しい配列を返す。指定の id が見つからなければ `null` を返す(B-3。位置を番号ではなく直前の項目の id で持つ)
+
+**`replaceItem.ts`**: 指定の id の項目を置き換えた新しい配列を返す。見つからなければ同じ配列(D-3)
+
+**`sumMergeItemsMilliseconds.ts`**: `MergeItem[]` の合計の長さをミリ秒の整数で返す。動画は今の `sumDurationMilliseconds` と同じ丸め、テキストの場面は `durationTenths * 100` を足す(浮動小数を経由しない。サーバーの `validate_merge_request` と同じ値。D-3)
+
+**`countVideoItems.ts`**: 動画の本数を返す(テキストの場面を数えない。D-3)
 
 **`summarizeSceneText.ts`**: 表示用の1行目と「…」の有無
 
 **`checkMergeable.ts`**(変更): 入力を `{ videoCount, itemCount, totalSeconds, isMerging, isEditing }` にする
 - 判定の順: 結合中 > 編集中 > 動画0本「結合するには動画が1本以上必要です」 > 合わせて1つ以下「結合するには動画とテキストの場面を合わせて2つ以上必要です」 > 長さ
-- 文言はサーバー(プラン1の表)と同じにする
+- 文言はサーバー(プラン1の表)と同じにする。超過の時間は今の `formatExcess`(秒に切り上げ)で出すので、サーバーの `format_excess` と同じ文言になる(B-8)
 
-**`sumDurationMilliseconds.ts`**: 変更しない。呼び出し側で、テキストの場面は `durationTenths / 10` 秒として渡すのではなく、ミリ秒の整数(`durationTenths * 100`)を足す(浮動小数を経由しない)。そのため `useMergeQueue` で「動画の合計(今の関数)+ テキストの場面の合計」とする
+**`sumDurationMilliseconds.ts`**: 変更しない。`sumMergeItemsMilliseconds` が動画の分に使う
 
-**`toMergeRequestItems.ts`**: `MergeItem[]` → API の `items`(動画は `{type:"video", video_id}`、テキストの場面は `{type:"text", text, duration_tenths}`)
+**`toMergeRequestItems.ts`**: `MergeItem[]` → API の `items`(動画は `{type:"video", video_id}`、テキストの場面は `{type:"text", text, duration_tenths}`)。呼ぶのは `requestMerge.ts` だけ(D-2)
 
 ### 状態(`useMergeQueue.ts`)
 
-- `items: MergeItem[]`、`editor: { mode: "insert", afterIndex } | { mode: "edit", id } | null`
-- `openInsert(afterIndex)`、`openEdit(id)`、`closeEditor()`、`confirmText(text, durationTenths)`(挿入または置き換えて `editor` を閉じる)
+- `items: MergeItem[]`、`editor: { mode: "insert", afterId: string | null } | { mode: "edit", id } | null`(挿入の位置は直前の項目の id。先頭は `null`。B-3)
+- `openInsert(afterId)`、`openEdit(id)`、`closeEditor()`、`confirmText(text, durationTenths)`(`insertItemAfter` または `replaceItem` を呼び、`editor` を閉じる)
+  - 挿入の直前の項目が見つからない(入力欄を開く前に始めた動画の削除が完了した、など)ときは、入力欄を閉じずに「挿入する位置の項目がなくなりました。取り消して、もう一度挿入してください」を表示する
+- `move`・`removeItem` は、入力欄が開いている間は何もしない(ボタンを押せなくするのに加えて、状態の側でも守る。B-3)
 - `removeItem(id)`: テキストの場面なら一覧から外すだけ(API を呼ばない)。動画は今のまま
-- `videoCount`(動画の本数)、`totalSeconds`(テキストの場面を含む)、`requestItems`(`toMergeRequestItems` の結果)を返す
+- `videoCount`(`countVideoItems`)、`totalSeconds`(`sumMergeItemsMilliseconds` / 1000)を返す。API の形(`items`)は返さない(D-2)
+- フックの中に計算や配列の組み替えを書かず、上の純粋関数を呼ぶだけにする(D-3)
 - 動画の削除の失敗で元の位置に戻す処理(video-merge の I30)は、テキストの場面が混ざっても元の位置に戻ることを確かめる
 
 ### 画面の部品
@@ -98,16 +112,19 @@ export type MergeItem = VideoItem | TextSceneItem;
 | `frontend/src/features/merge/types.ts` | 結合リストの項目と応答の型 | `MergeItem` を共用体にする |
 | `frontend/src/features/merge/normalizeSceneText.ts` | テキストを正規化して確かめる | 新規 |
 | `frontend/src/features/merge/parseSceneDuration.ts` | 表示時間の入力を0.1秒単位の整数にする | 新規 |
-| `frontend/src/features/merge/insertItem.ts` | 指定の位置に項目を入れる | 新規 |
+| `frontend/src/features/merge/insertItemAfter.ts` | 指定の id の項目の後に項目を入れる | 新規(B-3) |
+| `frontend/src/features/merge/replaceItem.ts` | 指定の id の項目を置き換える | 新規(D-3) |
+| `frontend/src/features/merge/sumMergeItemsMilliseconds.ts` | 結合リストの合計の長さをミリ秒の整数で返す | 新規(D-3) |
+| `frontend/src/features/merge/countVideoItems.ts` | 結合リストの動画の本数を返す | 新規(D-3) |
 | `frontend/src/features/merge/summarizeSceneText.ts` | 一覧に出す1行目を作る | 新規 |
-| `frontend/src/features/merge/toMergeRequestItems.ts` | 結合リストを API の `items` にする | 新規 |
+| `frontend/src/features/merge/toMergeRequestItems.ts` | 結合リストを API の `items` にする | 新規。`requestMerge.ts` からだけ呼ぶ(D-2) |
 | `frontend/src/features/merge/TextSceneEditor.tsx` | テキストと表示時間の入力欄と確定・取り消し | 新規 |
 | `frontend/src/features/merge/VideoOrderList.tsx` → `MergeOrderList.tsx` | 結合リストの表示と操作のボタン | 改名し、テキストの場面の行と挿入・編集のボタン、入力欄の差し込みを足す |
 | `frontend/src/features/merge/checkMergeable.ts` | 結合できるかと理由を返す | 入力と判定を変える |
 | `frontend/src/features/merge/useMergeQueue.ts` | 結合リストの状態と操作 | テキストの場面と入力欄の状態を足す |
-| `frontend/src/features/merge/requestMerge.ts` | 結合を依頼する | 引数を `MergeItem[]` にする(プラン1では動画だけ) |
-| `frontend/src/features/merge/useMergeJob.ts` | 結合ジョブの開始と問い合わせ | `start` の引数を `MergeItem[]` にする |
-| `frontend/src/app/App.tsx` | 画面の組み立て | `mergeCount` に `videoCount` を渡す。`MergeOrderList` と新しい `checkMergeable` の入力 |
+| `frontend/src/features/merge/requestMerge.ts` | 結合を依頼する(API の本文の形への変換もここだけで行う) | 引数を `MergeItem[]` にし、中で `toMergeRequestItems` を呼ぶ(プラン1では動画の ID の列を受け取り、中で `items` にしていた。D-2) |
+| `frontend/src/features/merge/useMergeJob.ts` | 結合ジョブの開始と問い合わせ | `start` の引数を `MergeItem[]` にし、そのまま `requestMerge` に渡す(変換しない。D-2) |
+| `frontend/src/app/App.tsx` | 画面の組み立て | `mergeCount` に `videoCount` を渡す。`mergeJob.start(mergeQueue.items)` を呼ぶ。`MergeOrderList` と新しい `checkMergeable` の入力 |
 
 `TextSceneEditor` の入力欄のラベル: 「テキスト」(`textarea`)、「表示時間(秒)」(`input type="text" inputMode="decimal"`。`type="number"` は「1e1」や小数の丸めをブラウザーが勝手に扱うため使わない)。ボタン: 「確定」「取り消し」。
 
@@ -139,14 +156,28 @@ E2E の補助として `e2e/support/inspectVideo.ts` に `brightBoundingBox(path
 - 20文字は ok、21文字の行は「1行は20文字までです(2行目が21文字)」(超えた行の番号)
 - 5行 × 20文字は ok
 - タブ → 「表示できない文字が含まれています: タブ」。U+200B → 「…: U+200B」
+- 先頭・末尾のタブ(`"\t京都"`、`"京都\t"`)、先頭の U+FEFF、末尾の U+0085 → どれも拒否(取り除かれて受け付けられない。サーバーと同じ。B-1)
+- 「京都😀」→「表示できない文字が含まれています: 😀」。「❤️」(U+2764 U+FE0F)も拒否。「©2026」「™」は ok(B-2)
 
 **`parseSceneDuration.test.ts`**
 - `"1"` → 10、`"1.0"` → 10、`"5.5"` → 55、`"60"` → 600、`" 3 "` → 30
 - `"0.9"`、`"60.1"`、`"61"`、`"5.55"`、`"abc"`、`""`、`"1e1"`、`"-1"`、`"５"`(全角数字)→ エラーの文言
 
-**`insertItem.test.ts`**
-- [A,B] の先頭(-1)に T → [T,A,B]、0 の後 → [A,T,B]、1 の後(末尾)→ [A,B,T]
+**`insertItemAfter.test.ts`**(B-3)
+- [A,B] の先頭(`null`)に T → [T,A,B]、A の後 → [A,T,B]、B の後(末尾)→ [A,B,T]
+- 存在しない id の後 → `null`
 - 元の配列は変更しない
+
+**`replaceItem.test.ts`**(D-3)
+- [A,T1,B] の T1 を T2 に → [A,T2,B]。存在しない id → 同じ並び。元の配列は変更しない
+
+**`sumMergeItemsMilliseconds.test.ts`**(D-3)
+- 動画 1.5秒 + テキストの場面 55 → 7000
+- 動画 [600.1, 600.2] + テキストの場面 5997 → 1800000(サーバーの `test_validate_merge_request.py` と同じ入力と値)
+- 空 → 0
+
+**`countVideoItems.test.ts`**(D-3)
+- [テキスト, 動画, テキスト, 動画] → 2。テキストの場面だけ → 0
 
 **`summarizeSceneText.test.ts`**
 - 1行 → そのまま、「…」なし。2行 → 1行目と「…」あり
@@ -159,16 +190,19 @@ E2E の補助として `e2e/support/inspectVideo.ts` に `brightBoundingBox(path
 - 動画1本だけ → 「結合するには動画とテキストの場面を合わせて2つ以上必要です」
 - テキストの場面2つだけ → 「結合するには動画が1本以上必要です」
 - 入力欄が開いている → 不可で「テキストの入力を確定するか取り消してください」
-- 長さ: 動画 1790秒 + テキストの場面 10.0秒は可、10.1秒は不可で超過0.1秒
+- 長さ: 動画 1790秒 + テキストの場面 10.0秒は可、10.1秒は不可で超過0.1秒、message は「結合後の長さが30分を1秒超えています」(サーバーと同じ文言。B-8)
 - 理由が重なるときは、結合中 > 編集中 > 動画0本 > 合わせて1つ以下 > 長さ の順で1つ
 
 **`useMergeQueue.test.ts`**(追加。`deleteVideo` は差し替える)
 - 「先頭にテキストを挿入」→ 確定すると先頭に入る。行1の後に挿入 → 2番目に入る。末尾の行の後にも入る
 - 編集で文言と表示時間を変えると、同じ位置のまま置き換わる
 - テキストの場面の削除では `deleteVideo` を呼ばない
-- テキストの場面の並べ替えが、`requestItems` の順に反映される
+- テキストの場面の並べ替えが、`items` の順に反映される
 - `totalSeconds` は 動画 1.5秒 + テキストの場面 55 で 7.0。`videoCount` はテキストの場面を数えない
 - 動画の削除が失敗したとき、テキストの場面が間にあっても元の位置に戻る
+- 入力欄が開いている間は、`move`・`removeItem` を呼んでも並びが変わらない(B-3)
+- [A,B,C] で B の後に挿入する入力欄を開いている間に、先に始めていた A の削除が失敗して A が元の位置に戻っても、確定すると B の直後に入る(B-3。位置を id で持つ)
+- 挿入の直前の項目が、入力中に先に始めていた削除の完了で消えたら、確定しても入らず、入力欄に理由が表示される
 
 **`TextSceneEditor.test.tsx`**
 - 表示時間の初期値が「3.0」。編集では今の値
@@ -181,13 +215,14 @@ E2E の補助として `e2e/support/inspectVideo.ts` に `brightBoundingBox(path
 **`MergeOrderList.test.tsx`**(既存の `VideoOrderList.test.tsx` を改名して追加)
 - テキストの場面の行が「📝 2026年10月9日…(3.0秒)」と表示され、ラベルが「テキストの場面: 2026年10月9日」
 - 「先頭にテキストを挿入」と各行の「この後にテキストを挿入」で、入力欄がその位置に開く
-- 入力欄が開いている間は、ほかの挿入・編集ボタンが押せない
+- 入力欄が開いている間は、ほかの挿入・編集ボタンに加えて、並べ替えと削除のボタンも押せない(B-3)
 - 結合中は、挿入・編集・削除・並べ替えのボタンがすべて押せない
 - 動画の行に「編集」ボタンがない
 
 **`requestMerge.test.ts`、`useMergeJob.test.ts`**(書き換え)
-- `items` に、渡した並び順どおりの動画とテキストの場面が入る
-- 422 `unsupported_characters` で、サーバーの `message` を返す
+- `requestMerge` に `MergeItem[]` を渡すと、本文の `items` に、渡した並び順どおりの動画とテキストの場面が API の形で入る(D-2)
+- `useMergeJob.start` は受け取った `MergeItem[]` をそのまま `requestMerge` に渡す
+- 422 `unsupported_characters`・`output_too_small_for_text` で、サーバーの `message` を返す
 
 **`frontend/tests/unit/app/App.test.tsx`**(追加)
 - テキストの場面を挿入しても、アップロードの残りの枠が減らない(`mergeCount` は動画の本数)
@@ -202,7 +237,9 @@ E2E の補助として `e2e/support/inspectVideo.ts` に `brightBoundingBox(path
 - テキストの場面を挿入してから「編集」で表示時間を「2.0」に変え、「上へ」で動かして結合すると、変えた位置・長さ(合計 = 動画 + 2秒 ± 許容)になる(ストーリー3)
 - テキストの場面を削除して結合すると、動画だけの長さになる(ストーリー3のシナリオ3)
 - 21文字の行を入力して「確定」を押すと理由が表示され、リストに入らない(SC-005)
-- 「😀」を含むテキストを確定して結合ボタンを押すと、「…表示できない文字が含まれています: 😀」が表示され、結合が始まらない(SC-005a)
+- 「😀」を含むテキストで「確定」を押すと、入力欄に「表示できない文字が含まれています: 😀」が表示され、リストに入らない(SC-005a、B-2)
+- 絵文字ではないがフォントにない文字(ハングルの「한」。実装時にフォントの文字の集合にないことを確かめて選ぶ)を含むテキストは確定でき、結合ボタンを押すと「…番目のテキストの場面: 表示できない文字が含まれています: 한」が表示され、結合が始まらない(サーバー側の判定。SC-005a)
+- 赤の後に挿入する入力欄を開いている間は、赤・青の並べ替えと削除のボタンを押せない(B-3)
 - 入力欄を開いたままでは結合ボタンを押せない
 - 合計が30分を超える組み合わせ(901秒の動画 + 900秒の動画 + テキストの場面 1.0秒 → 30:02)で、超過の表示と結合ボタンの無効化(ストーリー2のシナリオ4、SC-006。既存の `mergeLimits.spec.ts` と同じく低解像度・低 fps の動画で作る)
 
@@ -212,7 +249,7 @@ SC-004(縦長・横長で収まる)と SC-003(長さの精度)は、出力の解
 
 | # | タスク | 担当 | 備考 |
 |---|---|---|---|
-| 1 | 純粋関数(`normalizeSceneText`、`parseSceneDuration`、`insertItem`、`summarizeSceneText`、`toMergeRequestItems`) | Sonnet のサブエージェント | 仕様と境界値がこのプランとプラン1で確定している。期待値はプラン1の単体テストとそろえる |
+| 1 | 純粋関数(`normalizeSceneText`、`parseSceneDuration`、`insertItemAfter`、`replaceItem`、`sumMergeItemsMilliseconds`、`countVideoItems`、`summarizeSceneText`、`toMergeRequestItems`) | Sonnet のサブエージェント | 仕様と境界値がこのプランとプラン1で確定している。期待値はプラン1の単体テストとそろえる(取り除く文字・拒否する文字・合計の値) |
 | 2 | `types.ts` の共用体化、`checkMergeable`、`useMergeQueue`、`requestMerge`、`useMergeJob` | Sonnet のサブエージェント | 既存テストを先に書き換えて Red を確かめてから進める |
 | 3 | `TextSceneEditor.tsx`、`MergeOrderList.tsx`(改名を含む)、`App.tsx` | Sonnet のサブエージェント | 入力欄の開閉と、結合中・編集中のボタンの無効化 |
 | 4 | E2E の補助 `brightBoundingBox` | Haiku のサブエージェント | 定型作業 |
