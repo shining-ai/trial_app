@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.features.download.router import router as download_router
 from app.features.health.router import router as health_router
+from app.features.merge.load_scene_font import load_scene_font
 from app.features.merge.merge_job_store import MergeJobStore
 from app.features.merge.router import router as merge_router
 from app.features.upload.router import router as upload_router
@@ -22,8 +23,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(app_: FastAPI):
         use_startup_request_id()
+        app_.state.scene_font = load_scene_font(settings.scene_font_path)
         storage.uploads_dir().mkdir(parents=True, exist_ok=True)
         storage.merges_dir().mkdir(parents=True, exist_ok=True)
         cleanup_stale_files(storage, settings.stale_file_hours)

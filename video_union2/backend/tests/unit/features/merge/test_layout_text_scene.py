@@ -1,6 +1,13 @@
 import pytest
 
-from app.features.merge.layout_text_scene import layout_text_scene
+from app.features.merge.layout_text_scene import layout_text_scene, text_scene_font_size
+
+
+def test_font_size_alone_can_be_computed_before_measuring_lines():
+    assert text_scene_font_size(1080, 1920) == 48
+    assert text_scene_font_size(24, 23) == 1
+    with pytest.raises(ValueError):
+        text_scene_font_size(16, 16)
 
 
 def test_font_size_comes_from_the_short_side_of_the_output():
