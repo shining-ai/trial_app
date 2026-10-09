@@ -74,15 +74,38 @@ def test_text_scene_durations_are_summed_in_whole_milliseconds():
     assert _check_segments([_src(1, 600.1), _src(2, 600.2), _text(5998)])[1] == "too_long"
 
 
-def test_text_scene_length_is_counted_after_rounding_to_whole_frames_of_the_output():
-    one_fps = MergeSource(video_id="a" * 32, file_name="a.mp4", size_bytes=1, duration_seconds=1.0, width=640,
-                          height=360, fps_num=1, fps_den=1, has_audio=True, video_stream_index=0, audio_stream_index=1)
-    limit = Settings(max_total_seconds=4)
+def _video_at(fps_num, fps_den, duration):
+    return MergeSource(video_id="a" * 32, file_name="a.mp4", size_bytes=1, duration_seconds=duration, width=640,
+                       height=360, fps_num=fps_num, fps_den=fps_den, has_audio=True, video_stream_index=0,
+                       audio_stream_index=1)
 
-    # 指定どおりなら 1 + 1.5 + 1.5 = 4.0 秒だが、1fps では 1.5 秒が 2 フレーム(2.0 秒)になり 5.0 秒
-    assert _check_segments([one_fps, _text(15), _text(15)], settings=limit) == (
-        422, "too_long", "結合後の長さが0分を1秒超えています")
-    assert _check_segments([one_fps, _text(10), _text(20)], settings=limit) is None
+
+def test_ntsc_frame_rounding_within_one_frame_is_judged_like_the_screen():
+    ntsc = _video_at(30000, 1001, 1790.0)
+
+    # 10.0 秒は 300 フレーム = 10.01 秒になるが、1フレームの範囲なので画面と同じく許可する
+    assert _check_segments([ntsc, _text(100)]) is None
+    assert _check_segments([_video_at(30000, 1001, 1799.0), _text(10)]) is None
+    assert _check_segments([ntsc, _text(101)]) == (422, "too_long", "結合後の長さが30分を1秒超えています")
+
+
+def test_low_fps_rounding_that_lengthens_the_output_beyond_one_frame_is_rejected():
+    one_fps = _video_at(1, 1, 1.0)
+    limit = Settings(max_total_seconds=7)
+
+    # 指定どおりなら 1 + 1.5 × 4 = 7.0 秒だが、1fps では 1.5 秒が 2 フレーム(2.0 秒)になり 9.0 秒。上限 + 1フレーム(8秒)を超える
+    assert _check_segments([one_fps] + [_text(15)] * 4, settings=limit) == (
+        422, "too_long", "結合後の長さが0分を2秒超えています")
+    # 1 + 1.5 + 1.5 + 2.0 + 1.0 = 7.0 秒が、丸めると 1 + 2 + 2 + 2 + 1 = 8 秒。上限 + 1フレームちょうどは許可
+    assert _check_segments([one_fps, _text(15), _text(15), _text(20), _text(10)], settings=limit) is None
+
+
+def test_rounding_that_shortens_a_text_scene_does_not_loosen_the_limit():
+    one_fps = _video_at(1, 1, 1.0)
+    limit = Settings(max_total_seconds=3)
+
+    # 1.4 秒は 1fps で 1 フレーム(1.0 秒)になるが、指定の 1 + 1.4 + 1.4 = 3.8 秒で判定する
+    assert _check_segments([one_fps, _text(14), _text(14)], settings=limit)[1] == "too_long"
 
 
 def test_text_scene_needs_an_output_whose_short_side_is_at_least_23_pixels():

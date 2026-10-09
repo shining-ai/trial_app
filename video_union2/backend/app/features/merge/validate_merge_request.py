@@ -31,13 +31,18 @@ def validate_merge_request(
     output = plan_output_format(sources, settings.max_fps) if sources else None
     # 浮動小数の足し算の誤差で画面と判定が食い違わないよう、各動画をミリ秒の整数にしてから足す
     # (画面の sumMergeItemsMilliseconds と同じ計算: 0.5 ミリ秒は切り上げ。テキストの場面は0.1秒単位の整数から)
-    total_ms = sum(math.floor(s.duration_seconds * 1000 + 0.5) for s in sources)
-    total_ms += sum(_text_scene_milliseconds(t, output) for t in texts)
-    limit = settings.max_total_seconds
-    if total_ms > limit * 1000:
-        minutes = limit // 60
-        excess = (total_ms - limit * 1000) / 1000
-        return MergeRequestFailure(422, "too_long", f"結合後の長さが{minutes}分を{format_excess(excess)}超えています")
+    videos_ms = sum(math.floor(s.duration_seconds * 1000 + 0.5) for s in sources)
+    limit_ms = settings.max_total_seconds * 1000
+    specified_ms = videos_ms + sum(t.duration_tenths * 100 for t in texts)
+    if specified_ms > limit_ms:
+        return _too_long(specified_ms - limit_ms, settings)
+    # テキストの場面は出力のフレーム数に丸めて作るため、fps が低いと指定より長くなる。
+    # 出力の±1フレームのずれは許す(video-merge の Q13)ので、丸めたあとの合計が上限 + 1フレームを超えたときだけ断る
+    if texts and output is not None:
+        rounded_ms = videos_ms + sum(_rounded_milliseconds(t, output) for t in texts)
+        frame_ms = 1000 * output.fps_den / output.fps_num
+        if rounded_ms > limit_ms + frame_ms:
+            return _too_long(rounded_ms - limit_ms, settings)
 
     if texts and output is not None:
         try:
@@ -54,15 +59,14 @@ def validate_merge_request(
     return None
 
 
-def _text_scene_milliseconds(text: TextScene, output: OutputFormat | None) -> int:
-    """テキストの場面の長さ(ミリ秒)。指定の長さと、出力の fps のフレーム数に丸めた長さの長い方。
+def _too_long(excess_ms: float, settings: Settings) -> MergeRequestFailure:
+    minutes = settings.max_total_seconds // 60
+    return MergeRequestFailure(
+        422, "too_long", f"結合後の長さが{minutes}分を{format_excess(excess_ms / 1000)}超えています")
 
-    fps が低いと丸めで長くなり、指定の長さだけで数えると上限を超える出力を作ってしまうため。
-    短くなる場合は指定の長さで数え、画面(fps を知らない)と同じ判定にする。
-    """
-    specified = text.duration_tenths * 100
-    if output is None:
-        return specified
+
+def _rounded_milliseconds(text: TextScene, output: OutputFormat) -> int:
+    """テキストの場面を出力の fps のフレーム数に丸めたときの長さ(ミリ秒)。"""
     _, seconds = text_scene_duration(text.duration_tenths, output)
-    return max(specified, math.floor(seconds * 1000 + 0.5))
+    return math.floor(seconds * 1000 + 0.5)
 
