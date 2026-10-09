@@ -17,6 +17,13 @@ def test_settings_from_empty_environment_uses_defaults():
     assert settings.x264_preset == "veryfast"
     assert settings.x264_crf == 20
     assert settings.ffmpeg_timeout_per_second == 20
+    assert str(settings.scene_font_path) == "/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf"
+
+
+def test_settings_reads_scene_font_path_from_environment():
+    settings = Settings.from_env({"SCENE_FONT_PATH": "/fonts/custom.ttf"})
+
+    assert str(settings.scene_font_path) == "/fonts/custom.ttf"
 
 
 def test_settings_reads_values_from_environment():

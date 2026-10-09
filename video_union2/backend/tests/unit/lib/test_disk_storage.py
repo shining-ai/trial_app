@@ -20,6 +20,17 @@ def test_upload_paths_are_inside_uploads_dir(storage, tmp_path):
     assert storage.uploads_dir() == root / "uploads"
 
 
+def test_merge_text_image_path_is_inside_parts_dir(storage, tmp_path):
+    root = (tmp_path / "data").resolve()
+
+    assert storage.merge_text_image_path(VALID_ID, 3) == root / "merges" / VALID_ID / "parts" / "0003.png"
+
+
+def test_invalid_job_id_is_rejected_for_text_image_path(storage):
+    with pytest.raises(InvalidIdError):
+        storage.merge_text_image_path("../etc/passwd", 3)
+
+
 def test_merge_paths_are_inside_job_dir(storage, tmp_path):
     job_dir = (tmp_path / "data").resolve() / "merges" / VALID_ID
 

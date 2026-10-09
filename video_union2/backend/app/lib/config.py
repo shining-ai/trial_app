@@ -18,6 +18,7 @@ class Settings:
     x264_preset: str = "veryfast"
     x264_crf: int = 20
     ffmpeg_timeout_per_second: int = 20
+    scene_font_path: Path = Path("/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf")
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> "Settings":
@@ -37,6 +38,7 @@ class Settings:
             x264_preset=env.get("X264_PRESET", defaults.x264_preset),
             x264_crf=_int(env, "X264_CRF", defaults.x264_crf),
             ffmpeg_timeout_per_second=_int(env, "FFMPEG_TIMEOUT_PER_SECOND", defaults.ffmpeg_timeout_per_second),
+            scene_font_path=Path(env.get("SCENE_FONT_PATH", str(defaults.scene_font_path))),
         )
 
 
