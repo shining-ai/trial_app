@@ -27,7 +27,8 @@ export function SortableMergeList(props: {
     () => collisionInsideList(() => listRef.current?.getBoundingClientRect() ?? null),
     [],
   );
-  const accessibility = useMemo(() => dragAnnouncements(items), [items]);
+  // 読み上げの領域(role="status")は body の直下に出す。結合の区画の中に置くと、区画の status(結合ボタンの理由)と混ざるため
+  const accessibility = useMemo(() => ({ ...dragAnnouncements(items), container: document.body }), [items]);
 
   function handleDragEnd({ active, over }: DragEndEvent) {
     setDragging(false);

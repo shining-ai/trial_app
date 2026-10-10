@@ -23,6 +23,8 @@ export function dragAnnouncements(items: MergeItem[]): {
       const found = find(active.id);
       if (!found) return undefined;
       if (!over) return `${found.name} は一覧の外にあります。`;
+      // つかんだ直後に自分自身の上にいる通知が来るので、元の位置では読み上げない(「つかみました」を上書きしないため)
+      if (over.id === active.id) return undefined;
       const target = find(over.id);
       if (!target) return undefined;
       return `${found.name} を ${target.index + 1} 番目に動かしました。`;

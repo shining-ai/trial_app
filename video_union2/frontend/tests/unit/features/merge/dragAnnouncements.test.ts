@@ -40,6 +40,10 @@ describe("dragAnnouncements", () => {
     expect(announcements.onDragOver(args("blue", "red"))).toBe("blue.mp4 を 1 番目に動かしました。");
   });
 
+  test("元の位置(自分自身)の上では、動かしたと読み上げない(つかんだ直後の「つかみました」を上書きしないため)", () => {
+    expect(announcements.onDragOver(args("blue", "blue"))).toBeUndefined();
+  });
+
   test("blue を一覧の外へ動かすと「一覧の外にあります。」", () => {
     expect(announcements.onDragOver(args("blue", null))).toBe("blue.mp4 は一覧の外にあります。");
   });
