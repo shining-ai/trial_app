@@ -12,7 +12,7 @@
 | Q4 | ライブラリ | `@dnd-kit/core` 6.3.1・`@dnd-kit/sortable` 10.0.0・`@dnd-kit/utilities` 3.2.2 を `dependencies` に固定の版で入れる。lock は `npm install` で更新し、Docker は `npm ci` で入れる | マウス・タッチ・キーボードの3つに対応し、読み上げの文言を差し替えられる。HTML5 のドラッグ&ドロップはタッチで動かない |
 | Q5 | 開始の条件 | マウスは4ピクセル動かしたら開始。タッチは250ミリ秒の長押し(5ピクセルまでのずれは許す)。キーボードはスペースキーでつかみ、スペースキーで置き、Esc キーで取り消す(Enter は使わない) | クリック・スクロールとの区別(FR-006)。要件どおりの操作だけにする(レビュー P2-B8) |
 | Q6 | 読み上げ | つかんだ・動かした・置いた・取り消した、と操作の説明、役割の説明(`aria-roledescription`)をすべて日本語にする。位置は「n 番目」 | FR-005・SC-004。dnd-kit の既定の役割の説明は英語の "sortable"(レビュー P1-B3・T6) |
-| Q7 | ロック | 入力欄が開いている間と結合中は、つまみを無効にする(ネイティブの `disabled` と `useSortable` の `disabled` の両方)。離した時点(`onDragEnd`)でもロックを確かめ直す。状態の側(`moveById`)は、既存の `move` と同じく入力欄が開いているかだけを見る | FR-007。結合中かどうかは `useMergeJob` が持ち、`useMergeQueue` からは見えない。ドラッグ中にロックがかかっても dnd-kit は進行中のドラッグを止めない(レビュー P1-D1・P2-D2・B5) |
+| Q7 | ロック | 入力欄が開いている間と結合中は、つまみを無効にする(ネイティブの `disabled` と `useSortable` の `disabled` の両方)。ドラッグ中にロックがかかったら(キーボードでつかんだまま Tab と Enter で「結合する」「編集」を押した場合など)、Esc キーの操作を送ってドラッグを取り消す(実装レビュー ラウンド1で変更)。離した時点(`onDragEnd`)でもロックを確かめ直す。状態の側(`moveById`)は、既存の `move` と同じく入力欄が開いているかだけを見る | FR-007。結合中かどうかは `useMergeJob` が持ち、`useMergeQueue` からは見えない。ドラッグ中にロックがかかっても dnd-kit は進行中のドラッグを止めない(レビュー P1-D1・P2-D2・B5) |
 | Q8 | 並べ替えの基準 | 番号ではなく、動かす項目の id と、離した位置の項目の id で並べ替える。状態は関数で更新する | text-merge の実装レビュー J-6(削除の完了を待つ間に番号がずれた)の教訓 |
 | Q9 | 当たり判定 | 独自の判定: ポインターが結合リスト(`ol`)の枠の外なら「当たりなし」、中なら `closestCenter`。キーボード操作(ポインターの位置がない)ときは `closestCenter` | `closestCenter` だけだと一覧の外でも一番近い行が当たり、FR-004 を満たせない(レビュー P0-B1・Step 3 の最大の指摘) |
 | Q10 | 自動スクロール | dnd-kit の既定(画面の端に近づくとスクロール) | FR-008 |
@@ -50,7 +50,8 @@
 ### 画面の部品
 | ファイル | 担当(一文) | 変更 |
 |---|---|---|
-| `SortableMergeList.tsx`(新規) | `DndContext`(センサー、独自の当たり判定、日本語の読み上げ)と `SortableContext`(縦の一覧)で `ol` を並べ替えられるようにする | `onDragEnd` で `dragEndToMove` を呼び、結果があれば `onMoveById`。ドラッグ中は `ol` に `merge-list--dragging` |
+| `SortableMergeList.tsx`(新規) | `DndContext`(センサー、独自の当たり判定、日本語の読み上げ)と `SortableContext`(縦の一覧)で `ol` を並べ替えられるようにする | `onDragEnd` で `dragEndToMove` を呼び、結果があれば `onMoveById`。ドラッグ中は `ol` に `merge-list--dragging`。ドラッグ中にロックがかかったら取り消す。読み上げの領域は `body` の直下に出す |
+| `suppressFirstSelfOver.ts`(新規。実装レビューで追加) | つかんだ直後の、自分自身の上にいる最初の通知だけを読み上げないようにする | 「つかみました」をすぐ上書きしないため。一度動いたあとに元の位置へ戻ったときは読み上げる |
 | `SortableMergeItem.tsx`(新規) | `useSortable` で `li` 1つを並べ替えられるようにし、左端につまみを置いて `children` を描く | つまみ: `<button>`、`aria-label="{名前} をドラッグして並べ替え"`、表示「⋮⋮」、`disabled={locked}`、`useSortable({ id, disabled: locked, attributes: { roleDescription: "並べ替えできる項目" } })` の `attributes`・`listeners` はつまみにだけ付ける(`li` には付けない)。ドラッグ中は `merge-item--dragging` |
 | `useDragSensors.ts`(新規) | マウス(4ピクセル)・タッチ(250ミリ秒、5ピクセル)・キーボード(`sortableKeyboardCoordinates`、`keyboardCodes` はスペースと Esc だけ)のセンサーを返す | テストは書かない(設定値を写すだけになるため。マウス・キーボードは E2E、タッチは手動。レビュー B4) |
 | `MergeOrderList.tsx` | 結合リストの行の中身と操作のボタン、入力欄の差し込み | `ol` を `SortableMergeList` に、`li` を `SortableMergeItem` に置き換える。行の名前は `itemName` から取る。props に `onMoveById` を足す。テキストの場面の編集中(行が入力欄に置き換わっている間)も、つまみは無効で表示する |

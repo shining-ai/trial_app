@@ -31,19 +31,19 @@ export function SortableMergeList(props: {
     [],
   );
   const ids = useMemo(() => items.map((item) => item.id), [items]);
-  // 読み上げは一度だけ作り、そのときの一覧を参照する(ドラッグ中に一覧が変わっても「最初の自分自身の上」の記録を保つ)
-  const accessibility = useMemo(() => {
+  // 読み上げは最初の描画で一度だけ作り、そのときどきの一覧を参照する。
+  // 「最初の自分自身の上」の記録を持つので、捨てられうる useMemo ではなく useState で保つ
+  const [accessibility] = useState(() => {
     const current = () => dragAnnouncements(itemsRef.current);
     const announcements: Announcements = suppressFirstSelfOver({
       onDragStart: (args) => current().announcements.onDragStart(args),
-      onDragMove: (args) => current().announcements.onDragMove?.(args),
       onDragOver: (args) => current().announcements.onDragOver(args),
       onDragEnd: (args) => current().announcements.onDragEnd(args),
       onDragCancel: (args) => current().announcements.onDragCancel(args),
     });
     // 読み上げの領域(role="status")は body の直下に出す。結合の区画の中に置くと、区画の status(結合ボタンの理由)と混ざるため
     return { announcements, screenReaderInstructions: current().screenReaderInstructions, container: document.body };
-  }, []);
+  });
 
   useEffect(() => {
     // dnd-kit には外からドラッグを取り消す手段がないため、どのセンサーも取り消しに使う Esc キーを送る。
