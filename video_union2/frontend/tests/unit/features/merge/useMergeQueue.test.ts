@@ -677,3 +677,104 @@ test("削除の完了を待つ間に並べ替えても、削除が失敗した�
 
   expect(ids(result)).toEqual(["c", "a", "b"]);
 });
+
+test("moveById で、動かす項目を離した位置の項目の場所へ並べ替える", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+
+  act(() => {
+    result.current.moveById("c", "a");
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});
+
+test("挿入・編集の入力欄が開いている間は、moveById で並びが変わらない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  expect(ids(result)).toEqual(["a", "b"]);
+
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+});
+
+test("削除の完了を待つ間、動かす側・離した側のどちらかが削除中の項目なら、moveById で並びが変わらない", () => {
+  pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  act(() => {
+    void result.current.removeItem("b");
+  });
+
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  act(() => {
+    result.current.moveById("c", "b");
+  });
+
+  expect(ids(result)).toEqual(["a", "c"]);
+});
+
+test("削除の完了を待つ間に moveById で並べ替え、削除が失敗すると、削除した項目は元の直後の項目の前に戻る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.moveById("c", "b");
+  });
+  expect(ids(result)).toEqual(["c", "b"]);
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});
+
+test("画面に反映される前に追加された動画を、moveById が上書きしない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+
+  act(() => {
+    result.current.addItem(video("c", 1));
+    result.current.moveById("b", "a");
+  });
+
+  expect(ids(result)).toEqual(["b", "a", "c"]);
+});

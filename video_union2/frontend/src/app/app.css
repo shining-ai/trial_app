@@ -298,7 +298,7 @@ body {
   counter-increment: merge-item;
   display: grid;
   gap: 10px;
-  padding: 12px 14px 12px 52px;
+  padding: 12px 14px 12px 84px;
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -366,6 +366,66 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+}
+
+/* ---- ドラッグでの並べ替え ---- */
+
+.drag-handle {
+  position: absolute;
+  left: 44px;
+  top: 12px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: -3px;
+  line-height: 1;
+  cursor: grab;
+  /* 長押しでドラッグを始めるため、長押しの間の文字の選択・メニューを出さない。
+     touch-action: none にすると、長押しでない指の動きでスクロールできなくなるので使わない */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.drag-handle:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.drag-handle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.drag-handle:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.drag-handle[aria-pressed="true"] {
+  cursor: grabbing;
+  color: var(--accent);
+}
+
+.merge-item--dragging {
+  z-index: 2;
+  box-shadow: 0 12px 32px rgb(16 24 40 / 18%), 0 2px 6px rgb(16 24 40 / 10%);
+  border-color: var(--accent);
+}
+
+/* ドラッグ中は DOM の順の番号が古いまま見えるため、番号の丸を隠す */
+.merge-list--dragging .merge-item::before {
+  visibility: hidden;
 }
 
 .merge-list-area {

@@ -4,6 +4,7 @@ import { countVideoItems } from "./countVideoItems";
 import { deleteVideo } from "./deleteVideo";
 import { insertItemAfter } from "./insertItemAfter";
 import { moveItem, type MoveDirection } from "./moveItem";
+import { moveItemById } from "./moveItemById";
 import { replaceItem } from "./replaceItem";
 import { restoreRemovedItem } from "./restoreRemovedItem";
 import { sumMergeItemsMilliseconds } from "./sumMergeItemsMilliseconds";
@@ -34,6 +35,12 @@ export function useMergeQueue() {
   const move = useCallback((index: number, direction: MoveDirection) => {
     if (editorRef.current) return;
     setItems((current) => moveItem(current, index, direction));
+  }, []);
+
+  /** ドラッグで、activeId の項目を overId の項目の位置へ動かす。番号ではなく id で並べ替える(削除の待ち中もずれない)。 */
+  const moveById = useCallback((activeId: string, overId: string) => {
+    if (editorRef.current) return;
+    setItems((latest) => moveItemById(latest, activeId, overId));
   }, []);
 
   const openInsert = useCallback((afterId: string | null) => {
@@ -120,6 +127,7 @@ export function useMergeQueue() {
     editorError,
     addItem,
     move,
+    moveById,
     removeItem,
     openInsert,
     openEdit,

@@ -24,6 +24,7 @@ function renderList(overrides: Partial<Parameters<typeof MergeOrderList>[0]> = {
     onOpenEdit: vi.fn(),
     onConfirmText: vi.fn(),
     onCloseEditor: vi.fn(),
+    onMoveById: vi.fn(),
     ...overrides,
   };
   render(<MergeOrderList {...props} />);
@@ -93,7 +94,7 @@ test("結合中は並べ替え・削除・挿入のボタンがすべて押せ�
   renderList({ disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(19); // 3行 x (移動4 + 削除 + 挿入) + 先頭への挿入
+  expect(buttons).toHaveLength(22); // 3行 x (つまみ + 移動4 + 削除 + 挿入) + 先頭への挿入
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
 
@@ -281,6 +282,107 @@ test("結合中は、テキストの場面を含む一覧の挿入・編集・�
   renderList({ items: WITH_SCENE, disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(20); // 先頭への挿入1 + 動画2行 x 6 + テキストの場面の行 7
+  expect(buttons).toHaveLength(23); // 先頭への挿入1 + 動画2行 x 7 + テキストの場面の行 8(どの行もつまみを含む)
   expect(buttons.every((button) => button.disabled)).toBe(true);
+});
+
+
+const INSTRUCTIONS =
+  "並べ替えるには、スペースキーでつかみ、上下の矢印キーで動かし、もう一度スペースキーで置きます。Esc キーで取り消します。";
+
+test("各行に「{名前} をドラッグして並べ替え」のつまみがあり、役割の説明と操作の説明が日本語", () => {
+  renderList({ items: WITH_SCENE });
+
+  const handles = [
+    screen.getByRole("button", { name: "A.mp4 をドラッグして並べ替え" }),
+    screen.getByRole("button", { name: `${SCENE_LABEL} をドラッグして並べ替え` }),
+    screen.getByRole("button", { name: "B.mp4 をドラッグして並べ替え" }),
+  ];
+
+  for (const handle of handles) {
+    expect(handle.getAttribute("aria-roledescription")).toBe("並べ替えできる項目");
+    const describedBy = handle.getAttribute("aria-describedby");
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy!)?.textContent).toBe(INSTRUCTIONS);
+  }
+});
+
+test("ドラッグの属性はつまみにだけ付き、行(li)には付かない", () => {
+  renderList({ items: WITH_SCENE });
+
+  for (const row of rowsOf()) {
+    expect(row.getAttribute("aria-roledescription")).toBeNull();
+    expect(row.getAttribute("tabindex")).toBeNull();
+    expect(row.getAttribute("aria-describedby")).toBeNull();
+  }
+});
+
+test("入力欄が開いている間は、どの行のつまみも押せない(編集中の行のつまみも表示されて押せない)", () => {
+  renderList({ items: WITH_SCENE, editor: { mode: "edit", id: "text-1" } });
+
+  const handles = screen.getAllByRole("button", { name: /をドラッグして並べ替え$/ }) as HTMLButtonElement[];
+  expect(handles).toHaveLength(3);
+  expect(handles.every((handle) => handle.disabled)).toBe(true);
+});
+
+test("結合中は、つまみが押せない", () => {
+  renderList({ disabled: true });
+
+  const handles = screen.getAllByRole("button", { name: /をドラッグして並べ替え$/ }) as HTMLButtonElement[];
+  expect(handles).toHaveLength(3);
+  expect(handles.every((handle) => handle.disabled)).toBe(true);
+});
+
+test("1件だけの一覧でもつまみがあり、押せる", () => {
+  renderList({ items: [video("A")] });
+
+  expect((screen.getByRole("button", { name: "A.mp4 をドラッグして並べ替え" }) as HTMLButtonElement).disabled).toBe(
+    false,
+  );
+});
+
+/**
+ * 読み上げの領域(dnd-kit が body の直下に置く aria-live の status)に出た文を、出た順にすべて記録する。
+ * jsdom では行の位置がすべて0なので、つかんだ直後に「動かしました」で上書きされる。最後の文だけでなく履歴で確かめる。
+ */
+function recordAnnouncements(): { texts: string[]; stop: () => void } {
+  const texts: string[] = [];
+  const observer = new MutationObserver(() => {
+    for (const region of document.querySelectorAll('[role="status"][aria-live]')) {
+      const text = region.textContent ?? "";
+      if (text && texts[texts.length - 1] !== text) texts.push(text);
+    }
+  });
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  return { texts, stop: () => observer.disconnect() };
+}
+
+test("キーボード: つまみで Space を押すとつかんだことを読み上げ、Escape で取り消しを読み上げ、並べ替えは起きない", async () => {
+  const props = renderList();
+  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const announcements = recordAnnouncements();
+
+  handle.focus();
+  fireEvent.keyDown(handle, { code: "Space", key: " " });
+  // jsdom では「つかみました」と直後の「動かしました」が同じ描画にまとまるため、つかんだ文そのものは E2E で確かめる
+  await vi.waitFor(() => expect(announcements.texts.some((text) => text.startsWith("C.mp4 を"))).toBe(true));
+  fireEvent.keyDown(document.activeElement ?? handle, { code: "Escape", key: "Escape" });
+  await vi.waitFor(() =>
+    expect(announcements.texts).toContain("並べ替えを取り消しました。C.mp4 は 3 番目のままです。"),
+  );
+  announcements.stop();
+
+  expect(props.onMoveById).not.toHaveBeenCalled();
+});
+
+test("キーボード: 入力欄が開いている間は、つまみで Space を押してもつかまない(読み上げが出ない)", async () => {
+  renderList({ editor: { mode: "insert", afterId: null } });
+  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const announcements = recordAnnouncements();
+
+  fireEvent.keyDown(handle, { code: "Space", key: " " });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  announcements.stop();
+
+  expect(announcements.texts).toEqual([]);
 });

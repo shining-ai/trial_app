@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { formatDuration } from "../../lib/formatDuration";
 import type { MoveDirection } from "./moveItem";
+import { itemName } from "./itemName";
+import { SortableMergeItem } from "./SortableMergeItem";
+import { SortableMergeList } from "./SortableMergeList";
 import { summarizeSceneText } from "./summarizeSceneText";
 import { TextSceneEditor } from "./TextSceneEditor";
 import type { MergeItem, TextSceneItem } from "./types";
@@ -32,9 +35,11 @@ export function MergeOrderList(props: {
   onOpenEdit: (id: string) => void;
   onConfirmText: (text: string, durationTenths: number) => void;
   onCloseEditor: () => void;
+  /** ドラッグで、activeId の項目を overId の項目の位置へ動かす */
+  onMoveById: (activeId: string, overId: string) => void;
 }) {
   const { items, editor, editorError, disabled, deleteError, onMove, onRemove } = props;
-  const { onOpenInsert, onOpenEdit, onConfirmText, onCloseEditor } = props;
+  const { onOpenInsert, onOpenEdit, onConfirmText, onCloseEditor, onMoveById } = props;
   const lastIndex = items.length - 1;
   // 結合中と、入力欄が開いている間は、入力欄以外の操作をすべて止める(入力中に並びが変わらないようにする)
   const locked = disabled || editor !== null;
@@ -88,7 +93,7 @@ export function MergeOrderList(props: {
 
   function renderTextScene(item: TextSceneItem, index: number): ReactNode {
     const { firstLine, hasMore } = summarizeSceneText(item.text);
-    const name = `テキストの場面: ${firstLine}`;
+    const name = itemName(item);
     return (
       <div className="merge-item__row">
         <div className="merge-item__main">
@@ -157,11 +162,17 @@ export function MergeOrderList(props: {
       {editor?.mode === "insert" && editor.afterId === null
         ? renderEditor({ text: "", duration: DEFAULT_DURATION })
         : null}
-      <ol aria-label="結合リスト" className="merge-list">
+      <SortableMergeList items={items} locked={locked} onMoveById={onMoveById}>
         {items.map((item, index) => {
           const editing = editor?.mode === "edit" && editor.id === item.id && item.kind === "text";
           return (
-            <li key={item.id} className={`merge-item${item.kind === "text" ? " merge-item--text" : ""}`}>
+            <SortableMergeItem
+              key={item.id}
+              id={item.id}
+              name={itemName(item)}
+              locked={locked}
+              className={`merge-item${item.kind === "text" ? " merge-item--text" : ""}`}
+            >
               {editing
                 ? renderEditor({ text: item.text, duration: formatTenths(item.durationTenths) })
                 : item.kind === "text"
@@ -170,10 +181,10 @@ export function MergeOrderList(props: {
               {editor?.mode === "insert" && editor.afterId === item.id
                 ? renderEditor({ text: "", duration: DEFAULT_DURATION })
                 : null}
-            </li>
+            </SortableMergeItem>
           );
         })}
-      </ol>
+      </SortableMergeList>
       {insertTargetMissing ? renderEditor({ text: "", duration: DEFAULT_DURATION }) : null}
       {deleteError ? (
         <p role="alert" className="message message--error">

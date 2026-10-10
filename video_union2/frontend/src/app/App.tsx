@@ -54,6 +54,7 @@ export function App() {
           onOpenEdit={mergeQueue.openEdit}
           onConfirmText={mergeQueue.confirmText}
           onCloseEditor={mergeQueue.closeEditor}
+          onMoveById={mergeQueue.moveById}
         />
         <div className="merge-footer">
           <MergeSummary totalSeconds={mergeQueue.totalSeconds} excessSeconds={check.excessSeconds} />
