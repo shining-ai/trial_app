@@ -136,17 +136,17 @@ export function MergeOrderList(props: {
           <span className="merge-item__meta">{`${formatDuration(item.duration_seconds)} / ${item.width}x${item.height}`}</span>
         </div>{" "}
         <div className="merge-item__actions">
-          {renderMoveButtons(index, item.file_name)}
+          {renderMoveButtons(index, itemName(item))}
           <button
             type="button"
             className="btn btn--ghost btn--danger"
-            aria-label={`${item.file_name} を削除`}
+            aria-label={`${itemName(item)} を削除`}
             disabled={locked}
             onClick={() => onRemove(item.id)}
           >
             削除
           </button>{" "}
-          {renderInsertButton(item, item.file_name)}
+          {renderInsertButton(item, itemName(item))}
         </div>
       </div>
     );

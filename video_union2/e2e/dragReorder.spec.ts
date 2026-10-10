@@ -74,9 +74,11 @@ async function mergeAndDownload(page: Page, savePath: string) {
   const link = page.getByRole("link", { name: "ダウンロード" });
   // dnd-kit は、ドラッグを離してから50ミリ秒の間のクリックを捨てる(離した場所での誤クリックを防ぐため)。
   // テストは人より速く押すので、結合が始まった(結合中の表示かダウンロードのリンクが出た)ことを確かめ、始まらなければ押し直す
+  // 結合がもう始まっている(結合中の表示かリンクが出ている)ときは押さない(結合を2回走らせないため)
+  const started = mergeSection(page).getByText("結合中です").or(link);
   await expect(async () => {
-    await mergeSection(page).getByRole("button", { name: "結合する" }).click();
-    await expect(mergeSection(page).getByText("結合中です").or(link)).toBeVisible({ timeout: 1_000 });
+    if (!(await started.isVisible())) await mergeSection(page).getByRole("button", { name: "結合する" }).click();
+    await expect(started).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 10_000 });
   await expect(link).toBeVisible({ timeout: 90_000 });
   const downloadPromise = page.waitForEvent("download");
@@ -166,12 +168,16 @@ test("キーボードだけで、スペースでつかみ、上矢印で動か�
   await expect(blue).toBeFocused();
 });
 
-test("キーボードでつかんで動かしたあと Esc キーを押すと、並びは変わらない", async ({ page }) => {
+test("キーボードでつかんで動かし、元の位置に戻すとその位置を読み上げ、Esc キーで取り消すと並びは変わらない", async ({
+  page,
+}) => {
   await uploadThree(page);
 
   await handle(page, "blue.mp4").focus();
   await page.keyboard.press("Space");
   await expect(announcement(page)).toHaveText("blue.mp4 をつかみました。今は 3 番目です。");
+  await pressUntilAnnounced(page, "ArrowUp", "blue.mp4 を 2 番目に動かしました。");
+  await pressUntilAnnounced(page, "ArrowDown", "blue.mp4 を 3 番目に動かしました。");
   await pressUntilAnnounced(page, "ArrowUp", "blue.mp4 を 2 番目に動かしました。");
   await page.keyboard.press("Escape");
 

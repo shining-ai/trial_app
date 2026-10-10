@@ -27,8 +27,12 @@ function renderList(overrides: Partial<Parameters<typeof MergeOrderList>[0]> = {
     onMoveById: vi.fn(),
     ...overrides,
   };
-  render(<MergeOrderList {...props} />);
-  return props;
+  const { rerender } = render(<MergeOrderList {...props} />);
+  return {
+    ...props,
+    rerenderWith: (next: Partial<Parameters<typeof MergeOrderList>[0]>) =>
+      rerender(<MergeOrderList {...props} {...next} />),
+  };
 }
 
 test("3件を並び順どおりに、番号付きリスト(ol)で長さと解像度つきで表示する", () => {
@@ -385,4 +389,42 @@ test("キーボード: 入力欄が開いている間は、つまみで Space �
   announcements.stop();
 
   expect(announcements.texts).toEqual([]);
+});
+
+test.each([
+  ["結合が始まった", { disabled: true }],
+  ["入力欄が開いた", { editor: { mode: "insert" as const, afterId: null } }],
+])("キーボードでつかんでいる間に%sら、ドラッグを取り消し、そのあとスペースを押しても並べ替えない", async (_, lock) => {
+  const props = renderList();
+  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const announcements = recordAnnouncements();
+  handle.focus();
+  fireEvent.keyDown(handle, { code: "Space", key: " " });
+  await vi.waitFor(() => expect(announcements.texts.some((text) => text.startsWith("C.mp4 を"))).toBe(true));
+
+  props.rerenderWith(lock);
+  await vi.waitFor(() =>
+    expect(announcements.texts).toContain("並べ替えを取り消しました。C.mp4 は 3 番目のままです。"),
+  );
+  fireEvent.keyDown(document, { code: "Space", key: " " });
+  announcements.stop();
+
+  expect(props.onMoveById).not.toHaveBeenCalled();
+  expect(announcements.texts.some((text) => text.includes("置きました"))).toBe(false);
+});
+
+test("HTML の特殊文字を含む名前も、つまみの名前と読み上げにそのまま文字として出て、要素は作られない", async () => {
+  const name = '<img src=x onerror="alert(1)">.mp4';
+  renderList({ items: [{ ...video("A"), file_name: name }, video("B")] });
+  const handle = screen.getByRole("button", { name: `${name} をドラッグして並べ替え` });
+  const announcements = recordAnnouncements();
+
+  handle.focus();
+  fireEvent.keyDown(handle, { code: "Space", key: " " });
+  await vi.waitFor(() => expect(announcements.texts.some((text) => text.startsWith(name))).toBe(true));
+  fireEvent.keyDown(document.activeElement ?? handle, { code: "Escape", key: "Escape" });
+  await vi.waitFor(() => expect(announcements.texts).toContain(`並べ替えを取り消しました。${name} は 1 番目のままです。`));
+  announcements.stop();
+
+  expect(document.querySelector("img")).toBeNull();
 });
