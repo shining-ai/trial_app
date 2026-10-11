@@ -215,11 +215,22 @@ test("テキストの場面の行の余白(説明の文字の右側)をつかん
   await mergeSection(page).getByLabel("テキスト", { exact: true }).fill("■");
   await mergeSection(page).getByRole("button", { name: "確定" }).click();
   await expectOrder(page, ["red.mp4", "📝 ■(3.0秒)", "blue.mp4"]);
-  // 行の右上の、ボタンも文字もない余白
+  // 説明の文字「テキストの場面」と同じ高さで、行の右端から60ピクセル内側の余白
+  // (その位置がこの行の中で、ボタンでも文字でもないことを確かめてから押す)
   const row = rows(page).nth(1);
-  await row.scrollIntoViewIfNeeded();
-  const box = (await row.boundingBox())!;
-  const start = { x: box.x + box.width - 40, y: box.y + 20 };
+  const meta = row.getByText("テキストの場面", { exact: true });
+  await meta.scrollIntoViewIfNeeded();
+  const rowBox = (await row.boundingBox())!;
+  const metaBox = (await meta.boundingBox())!;
+  const start = { x: rowBox.x + rowBox.width - 60, y: metaBox.y + metaBox.height / 2 };
+  const hit = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    const range = document.caretRangeFromPoint(x, y);
+    const overText = !!range && range.startContainer.nodeType === Node.TEXT_NODE &&
+      (() => { const r = document.createRange(); r.selectNodeContents(range.startContainer); const b = r.getBoundingClientRect(); return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom; })();
+    return { inRow: element?.closest("li")?.textContent?.includes("テキストの場面") ?? false, button: !!element?.closest("button"), overText };
+  }, start);
+  expect(hit).toEqual({ inRow: true, button: false, overText: false });
   const target = await centerOf(handle(page, "blue.mp4"));
 
   await page.mouse.move(start.x, start.y);
@@ -251,4 +262,43 @@ test("行の中のボタンでスペースキーを押しても、ドラッグ�
 
   await expectOrder(page, ["red.mp4", "blue.mp4", "green.mp4"]);
   await expect(announcement(page)).not.toHaveText(/つかみました/);
+});
+
+test("行の中のボタンの上で押して大きく動かすとドラッグになり、ボタンは押されない(削除されない)", async ({ page }) => {
+  await uploadThree(page);
+
+  await drag(
+    page,
+    mergeSection(page).getByRole("button", { name: "blue.mp4 を削除" }),
+    await centerOf(handle(page, "red.mp4")),
+  );
+
+  await expect(announcement(page)).toHaveText("blue.mp4 を 1 番目に置きました。");
+  await expectOrder(page, ["blue.mp4", "red.mp4", "green.mp4"]);
+});
+
+test("行の中のボタンの上で押して少し(2ピクセル)ずれて離すと、ドラッグにならずボタンとして働く", async ({ page }) => {
+  await uploadThree(page);
+  const up = await centerOf(mergeSection(page).getByRole("button", { name: "blue.mp4 を上へ" }));
+
+  await page.mouse.move(up.x, up.y);
+  await page.mouse.down();
+  await page.mouse.move(up.x + 2, up.y, { steps: 2 });
+  await page.mouse.up();
+
+  await expectOrder(page, ["red.mp4", "blue.mp4", "green.mp4"]);
+});
+
+test("入力欄を開いている間は、行の本体(ファイル名)からドラッグしても並ばない", async ({ page }) => {
+  await uploadThree(page);
+  await mergeSection(page).getByRole("button", { name: "先頭にテキストを挿入" }).click();
+
+  await drag(
+    page,
+    rows(page).nth(2).getByText("blue.mp4", { exact: true }),
+    await centerOf(rows(page).nth(0).getByText("red.mp4", { exact: true })),
+  );
+
+  await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
+  await expect(announcement(page)).not.toHaveText(/つかみました|置きました/);
 });

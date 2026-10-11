@@ -401,7 +401,7 @@ body {
   -webkit-touch-callout: none;
 }
 
-.merge-item--draggable .btn {
+.merge-item--draggable .btn:not(:disabled) {
   cursor: pointer;
 }
 
