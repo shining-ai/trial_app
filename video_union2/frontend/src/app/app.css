@@ -388,12 +388,26 @@ body {
   letter-spacing: -3px;
   line-height: 1;
   cursor: grab;
-  /* 長押しでドラッグを始めるため、長押しの間の文字の選択・メニューを出さない。
-     touch-action: none にすると、長押しでない指の動きでスクロールできなくなるので使わない */
+}
+
+/* 行(パネル)のどこからでもドラッグできる(マウス・タッチ)。
+   長押しでドラッグを始めるため、長押しの間の文字の選択・メニューを出さない。
+   touch-action: none にすると、長押しでない指の動きでスクロールできなくなるので使わない */
+.merge-item--draggable {
+  cursor: grab;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+.merge-item--draggable .btn {
+  cursor: pointer;
+}
+
+.merge-item--dragging,
+.merge-item--dragging .btn {
+  cursor: grabbing;
 }
 
 .drag-handle:hover:not(:disabled) {

@@ -198,13 +198,57 @@ test("入力欄を開いている間はつまみが押せずドラッグして�
   await expectOrder(page, ["blue.mp4", "red.mp4", "green.mp4"]);
 });
 
-test("行のファイル名の文字からはドラッグできない。そのあとボタンの並べ替えはふつうに使える", async ({ page }) => {
+test("行のファイル名の文字をつかんでドラッグしても並べ替えられる", async ({ page }) => {
   await uploadThree(page);
   const blueName = rows(page).nth(2).getByText("blue.mp4", { exact: true });
 
-  await drag(page, blueName, await centerOf(handle(page, "red.mp4")));
-  await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
+  await drag(page, blueName, await centerOf(rows(page).nth(0).getByText("red.mp4", { exact: true })));
+
+  await expectOrder(page, ["blue.mp4", "red.mp4", "green.mp4"]);
+  await expect(announcement(page)).toHaveText("blue.mp4 を 1 番目に置きました。");
+});
+
+test("テキストの場面の行の余白(説明の文字の右側)をつかんでドラッグしても並べ替えられる", async ({ page }) => {
+  await page.goto("/");
+  await uploadInOrder(page, [videoPath("red.mp4"), videoPath("blue.mp4")]);
+  await mergeSection(page).getByRole("button", { name: "red.mp4 の後にテキストを挿入" }).click();
+  await mergeSection(page).getByLabel("テキスト", { exact: true }).fill("■");
+  await mergeSection(page).getByRole("button", { name: "確定" }).click();
+  await expectOrder(page, ["red.mp4", "📝 ■(3.0秒)", "blue.mp4"]);
+  // 行の右上の、ボタンも文字もない余白
+  const row = rows(page).nth(1);
+  await row.scrollIntoViewIfNeeded();
+  const box = (await row.boundingBox())!;
+  const start = { x: box.x + box.width - 40, y: box.y + 20 };
+  const target = await centerOf(handle(page, "blue.mp4"));
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x, start.y + 10, { steps: 3 });
+  await page.mouse.move(target.x, target.y, { steps: 15 });
+  await page.mouse.move(target.x, target.y + 2, { steps: 2 });
+  await page.mouse.up();
+
+  await expectOrder(page, ["red.mp4", "blue.mp4", "📝 ■(3.0秒)"]);
+});
+
+test("行の中のボタンは、動かさずに押せばドラッグにならずボタンとして働く", async ({ page }) => {
+  await uploadThree(page);
 
   await mergeSection(page).getByRole("button", { name: "blue.mp4 を上へ" }).click();
+
   await expectOrder(page, ["red.mp4", "blue.mp4", "green.mp4"]);
+  await expect(announcement(page)).not.toHaveText(/置きました|つかみました/);
+});
+
+test("行の中のボタンでスペースキーを押しても、ドラッグは始まらずボタンとして働く(キーボードはつまみからだけ)", async ({
+  page,
+}) => {
+  await uploadThree(page);
+
+  await mergeSection(page).getByRole("button", { name: "blue.mp4 を上へ" }).focus();
+  await page.keyboard.press("Space");
+
+  await expectOrder(page, ["red.mp4", "blue.mp4", "green.mp4"]);
+  await expect(announcement(page)).not.toHaveText(/つかみました/);
 });
