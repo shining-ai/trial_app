@@ -169,6 +169,7 @@ export function MergeOrderList(props: {
             <SortableMergeItem
               key={item.id}
               id={item.id}
+              name={itemName(item)}
               locked={locked}
               className={`merge-item${item.kind === "text" ? " merge-item--text" : ""}`}
             >

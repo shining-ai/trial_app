@@ -386,6 +386,11 @@ body {
   box-shadow: var(--focus);
 }
 
+/* キーボードでつかんでいる行は、フォーカスの枠と浮いた影の両方を出す */
+.merge-item--dragging:focus-visible {
+  box-shadow: var(--focus), 0 12px 32px rgb(16 24 40 / 18%), 0 2px 6px rgb(16 24 40 / 10%);
+}
+
 .merge-item--draggable .btn:not(:disabled) {
   cursor: pointer;
 }
@@ -394,10 +399,6 @@ body {
 .merge-item--dragging .btn {
   cursor: grabbing;
 }
-
-
-
-
 
 .merge-item--dragging {
   z-index: 2;

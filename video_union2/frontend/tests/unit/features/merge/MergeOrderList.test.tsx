@@ -309,6 +309,12 @@ test("各行(li)が、そのままつかめる項目になる: 役割の説明�
   }
 });
 
+test("行にフォーカスしたときに、どの行かわかる名前が付く", () => {
+  renderList({ items: WITH_SCENE });
+
+  expect(rowsOf().map((row) => row.getAttribute("aria-label"))).toEqual(["A.mp4", SCENE_LABEL, "B.mp4"]);
+});
+
 test("つまみのボタンはない(行のどこでもつかめるため)", () => {
   renderList({ items: WITH_SCENE });
 
@@ -320,6 +326,17 @@ test("入力欄が開いている間は、どの行もフォーカスで止ま�
 
   expect(rowsOf().map((row) => row.getAttribute("tabindex"))).toEqual([null, null, null]);
   expect(rowsOf().map((row) => row.getAttribute("aria-disabled"))).toEqual([null, null, null]);
+  expect((screen.getByLabelText("テキスト") as HTMLTextAreaElement).closest("[aria-disabled='true']")).toBeNull();
+  // つかめない間は「並べ替えできる項目」とその操作の説明を案内しない
+  expect(rowsOf().map((row) => row.getAttribute("aria-roledescription"))).toEqual([null, null, null]);
+  expect(rowsOf().map((row) => row.getAttribute("aria-describedby"))).toEqual([null, null, null]);
+  expect(rowsOf().map((row) => row.getAttribute("role"))).toEqual(["listitem", "listitem", "listitem"]);
+});
+
+test("テキストの場面の編集中(行の中身が入力欄になる)も、どの行もフォーカスで止まらず、入力欄は無効扱いにならない", () => {
+  renderList({ items: WITH_SCENE, editor: { mode: "edit", id: "text-1" } });
+
+  expect(rowsOf().map((row) => row.getAttribute("tabindex"))).toEqual([null, null, null]);
   expect((screen.getByLabelText("テキスト") as HTMLTextAreaElement).closest("[aria-disabled='true']")).toBeNull();
 });
 
@@ -418,4 +435,18 @@ test("HTML の特殊文字を含む名前も、読み上げにそのまま文字
   announcements.stop();
 
   expect(document.querySelector("img")).toBeNull();
+});
+
+
+test("行の中のボタンでスペースキーを押してもつかまない(キーボードは行そのものからだけ)", async () => {
+  renderList();
+  const button = screen.getByRole("button", { name: "C.mp4 を上へ" });
+  const announcements = recordAnnouncements();
+
+  button.focus();
+  fireEvent.keyDown(button, { code: "Space", key: " " });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  announcements.stop();
+
+  expect(announcements.texts).toEqual([]);
 });

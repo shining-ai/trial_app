@@ -36,7 +36,7 @@
 
 ### 純粋関数(`frontend/src/features/merge/`)
 - **`moveItemById.ts`**: `(items, activeId, overId) => MergeItem[]`。activeId の項目を、overId の項目の位置へ動かした新しい配列を返す(結果は dnd-kit の `arrayMove` と同じ)。同じ id・見つからない id のときは、同じ並びの新しい配列を返す(既存の `moveItem` と同じく、元の配列とは別のもの)。元の配列は変えない
-- **`itemName.ts`**: 行の名前を返す。動画はファイル名、テキストの場面は「テキストの場面: {1行目}」。`MergeOrderList` の各ボタンの `aria-label`、つまみ、読み上げで同じ関数を使う
+- **`itemName.ts`**: 行の名前を返す。動画はファイル名、テキストの場面は「テキストの場面: {1行目}」。行(フォーカスしたときの名前)、`MergeOrderList` の各ボタンの `aria-label`、読み上げで同じ関数を使う
 - **`dragAnnouncements.ts`**: `(items: MergeItem[]) => { screenReaderInstructions, announcements }`。dnd-kit には id しか渡らないので、一覧から名前と位置(1始まり)を引く。「置いた」の番号は `moveItemById(items, active, over)` での位置と一致させる
   - 操作の説明: 「並べ替えるには、スペースキーでつかみ、上下の矢印キーで動かし、もう一度スペースキーで置きます。Esc キーで取り消します。」
   - つかんだ: 「{名前} をつかみました。今は {n} 番目です。」
@@ -56,7 +56,7 @@
 | `suppressFirstSelfOver.ts`(新規。実装レビューで追加) | つかんだ直後の、自分自身の上にいる最初の通知だけを読み上げないようにする | 「つかみました」をすぐ上書きしないため。一度動いたあとに元の位置へ戻ったときは読み上げる |
 | `SortableMergeItem.tsx`(新規) | `useSortable` で `li` 1つを、そのままつかんで並べ替えられるようにする | `useSortable({ id, disabled: locked, attributes: { role: "listitem", roleDescription: "並べ替えできる項目" } })`。`attributes`・`listeners`・開始点(`setActivatorNodeRef`)をすべて `li` に付ける。`aria-disabled` は付けず、ロック中は `tabIndex` を外す。ドラッグ中は `merge-item--dragging` |
 | `useDragSensors.ts`(新規) | マウス(4ピクセル)・タッチ(250ミリ秒、5ピクセル)・キーボード(`sortableKeyboardCoordinates`、`keyboardCodes` はスペースと Esc だけ)のセンサーを返す | テストは書かない(設定値を写すだけになるため。マウス・キーボードは E2E、タッチは手動。レビュー B4) |
-| `MergeOrderList.tsx` | 結合リストの行の中身と操作のボタン、入力欄の差し込み | `ol` を `SortableMergeList` に、`li` を `SortableMergeItem` に置き換える。行の名前は `itemName` から取る。props に `onMoveById` を足す。テキストの場面の編集中(行が入力欄に置き換わっている間)も、つまみは無効で表示する |
+| `MergeOrderList.tsx` | 結合リストの行の中身と操作のボタン、入力欄の差し込み | `ol` を `SortableMergeList` に、`li` を `SortableMergeItem` に置き換える。行の名前は `itemName` から取り、行(フォーカスしたときの名前)と各ボタンの `aria-label` に使う。props に `onMoveById` を足す |
 | `App.tsx` | 画面の組み立て | `onMoveById={mergeQueue.moveById}` を渡す |
 | `app/app.css` | 見た目 | 行全体(`cursor: grab`、キーボードでフォーカスしたときの枠。行の中の押せるボタンはクリックの形)、ドラッグできる行に Q12 のタッチの指定、ドラッグ中の行(影・前面)、並べ替えのアニメーション、ドラッグ中は番号の丸を隠す |
 
@@ -140,10 +140,13 @@
 ### Step 7 の動作確認の項目
 - メイン(Opus)が実際のブラウザで: マウスのドラッグ中の見た目(動かしている行が浮く、入る位置が空く、番号の丸が隠れる)を画面で記録する。長い一覧(動画をたくさん)で、画面の端へドラッグすると一覧がスクロールする
 - 人が実機(スマホ)で:
-  - 行の文字・余白・つまみのどこを長押ししても、そのまま指を動かすと並べ替わる
-  - 長押しせずに指を動かすと、スクロールするだけで並びは変わらない(行がほぼ全面つかめる場所になったので、指を止めてからスクロールしたときの使い心地も見る)
+  - 行の文字・余白のどこを長押ししても、そのまま指を動かすと並べ替わる
+  - 長押しせずに指を動かすと、スクロールするだけで並びは変わらない(行がほぼ全面つかめる場所なので、指を止めてからスクロールしたときの使い心地も見る)
   - 長押しの間に、文字の選択や長押しのメニューが出ない
   - 行の中のボタン(上へ・削除など)はタップすればボタンとして働く。ボタンを長押しして指を動かすとドラッグになり、ボタンは押されない
+- 人がパソコンで:
+  - Tab で行に止まると、行の周りにフォーカスの枠が出る。スペースキーでつかむと、枠と浮いた影の両方が出る
+  - 読み上げソフト(NVDA や VoiceOver)で行にフォーカスすると、行の名前(例: blue.mp4)と「並べ替えできる項目」、操作の説明が読まれる。入力欄が開いている間・結合中は「並べ替えできる項目」と読まれない
 
 ## 6. 実装順
 
