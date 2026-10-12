@@ -21,8 +21,25 @@ function rows(page: Page) {
   return mergeSection(page).getByRole("list", { name: "結合リスト" }).getByRole("listitem");
 }
 
-function handle(page: Page, name: string) {
-  return mergeSection(page).getByRole("button", { name: `${name} をドラッグして並べ替え` });
+/** 行の名前(動画はファイル名、テキストの場面は「テキストの場面: {1行目}」)を、行に表示している文字にする */
+function shownText(name: string) {
+  const prefix = "テキストの場面: ";
+  return name.startsWith(prefix) ? `📝 ${name.slice(prefix.length)}` : name;
+}
+
+/** 名前の行(パネル)。キーボードでフォーカスしてつかむ対象 */
+function row(page: Page, name: string) {
+  return rows(page).filter({ hasText: shownText(name) });
+}
+
+/**
+ * 行の中の名前の表示。マウスでつかむ位置と、離す目標に使う。
+ * テキストの場面の表示は読み上げ用に role="img" と名前を持つので、役割と名前で探す
+ */
+function grip(page: Page, name: string) {
+  return name.startsWith("テキストの場面: ")
+    ? row(page, name).getByRole("img", { name })
+    : row(page, name).getByText(name, { exact: true });
 }
 
 /** dnd-kit の読み上げの領域(aria-live 付きの status。結合ボタンの横の status とは別) */
@@ -45,7 +62,7 @@ async function centerOf(locator: Locator) {
 }
 
 /**
- * つまみ(または任意の要素)の中央で押し、目標の位置まで動かして離す。
+ * 指定の要素の中央で押し、目標の位置まで動かして離す。
  * 開始の条件(4ピクセル)を超えるよう先に少し動かし、目標までは細かく動かす。離す前の確認を beforeUp で行える。
  */
 async function drag(page: Page, from: Locator, to: { x: number; y: number }, beforeUp?: () => Promise<void>) {
@@ -92,13 +109,12 @@ async function uploadThree(page: Page) {
   await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
 }
 
-test("末尾の動画のつまみを先頭の行までドラッグすると、その順で結合される(ドラッグ中は入る位置を読み上げる)", async ({
+test("末尾の動画の行を先頭の行までドラッグすると、その順で結合される(ドラッグ中は入る位置を読み上げる)", async ({
   page,
 }, testInfo) => {
   await uploadThree(page);
 
-  await drag(page, handle(page, "blue.mp4"), await centerOf(handle(page, "red.mp4")), async () => {
-    await expect(handle(page, "blue.mp4")).toHaveAttribute("aria-pressed", "true");
+  await drag(page, grip(page, "blue.mp4"), await centerOf(grip(page, "red.mp4")), async () => {
     await expect(announcement(page)).toHaveText("blue.mp4 を 1 番目に動かしました。");
   });
 
@@ -110,7 +126,7 @@ test("末尾の動画のつまみを先頭の行までドラッグすると、�
   expect(colors.map((c, i) => isCloseColor(c, [BLUE, RED, GREEN][i]))).toEqual([true, true, true]);
 });
 
-test("テキストの場面のつまみを動画の下までドラッグすると、その位置に見出しが入って結合される", async ({
+test("テキストの場面の行を動画の下までドラッグすると、その位置に見出しが入って結合される", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -121,7 +137,7 @@ test("テキストの場面のつまみを動画の下までドラッグする�
   await mergeSection(page).getByRole("button", { name: "確定" }).click();
   await expectOrder(page, ["red.mp4", "📝 ■(1.0秒)", "blue.mp4"]);
 
-  await drag(page, handle(page, "テキストの場面: ■"), await centerOf(handle(page, "blue.mp4")));
+  await drag(page, grip(page, "テキストの場面: ■"), await centerOf(grip(page, "blue.mp4")));
 
   await expectOrder(page, ["red.mp4", "blue.mp4", "📝 ■(1.0秒)"]);
   const saved = testInfo.outputPath("merged.mp4");
@@ -135,7 +151,7 @@ test("テキストの場面のつまみを動画の下までドラッグする�
 test("先頭の動画を一覧の外(結合ボタンのあたり)まで動かして離すと、並びは変わらない", async ({ page }) => {
   await uploadThree(page);
 
-  await drag(page, handle(page, "red.mp4"), await centerOf(mergeSection(page).getByRole("button", { name: "結合する" })));
+  await drag(page, grip(page, "red.mp4"), await centerOf(mergeSection(page).getByRole("button", { name: "結合する" })));
 
   await expect(announcement(page)).toHaveText("red.mp4 を元の位置に戻しました。");
   await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
@@ -144,7 +160,7 @@ test("先頭の動画を一覧の外(結合ボタンのあたり)まで動かし
 test("ドラッグ中に Esc キーを押すと取り消され、並びは変わらない", async ({ page }) => {
   await uploadThree(page);
 
-  await drag(page, handle(page, "blue.mp4"), await centerOf(handle(page, "red.mp4")), async () => {
+  await drag(page, grip(page, "blue.mp4"), await centerOf(grip(page, "red.mp4")), async () => {
     await expect(announcement(page)).toHaveText("blue.mp4 を 1 番目に動かしました。");
     await page.keyboard.press("Escape");
     await expect(announcement(page)).toHaveText("並べ替えを取り消しました。blue.mp4 は 3 番目のままです。");
@@ -155,7 +171,7 @@ test("ドラッグ中に Esc キーを押すと取り消され、並びは変わ
 
 test("キーボードだけで、スペースでつかみ、上矢印で動かし、スペースで置ける(読み上げは日本語)", async ({ page }) => {
   await uploadThree(page);
-  const blue = handle(page, "blue.mp4");
+  const blue = row(page, "blue.mp4");
 
   await blue.focus();
   await page.keyboard.press("Space");
@@ -173,7 +189,7 @@ test("キーボードでつかんで動かし、元の位置に戻すとその�
 }) => {
   await uploadThree(page);
 
-  await handle(page, "blue.mp4").focus();
+  await row(page, "blue.mp4").focus();
   await page.keyboard.press("Space");
   await expect(announcement(page)).toHaveText("blue.mp4 をつかみました。今は 3 番目です。");
   await pressUntilAnnounced(page, "ArrowUp", "blue.mp4 を 2 番目に動かしました。");
@@ -185,16 +201,16 @@ test("キーボードでつかんで動かし、元の位置に戻すとその�
   await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
 });
 
-test("入力欄を開いている間はつまみが押せずドラッグしても並ばない。取り消すと同じ操作で並ぶ", async ({ page }) => {
+test("入力欄を開いている間は行をつかめずドラッグしても並ばない。取り消すと同じ操作で並ぶ", async ({ page }) => {
   await uploadThree(page);
   await mergeSection(page).getByRole("button", { name: "先頭にテキストを挿入" }).click();
 
-  await expect(handle(page, "blue.mp4")).toBeDisabled();
-  await drag(page, handle(page, "blue.mp4"), await centerOf(handle(page, "red.mp4")));
+  await expect(row(page, "blue.mp4")).not.toHaveAttribute("tabindex");
+  await drag(page, grip(page, "blue.mp4"), await centerOf(grip(page, "red.mp4")));
   await expectOrder(page, ["red.mp4", "green.mp4", "blue.mp4"]);
 
   await mergeSection(page).getByRole("button", { name: "取り消し" }).click();
-  await drag(page, handle(page, "blue.mp4"), await centerOf(handle(page, "red.mp4")));
+  await drag(page, grip(page, "blue.mp4"), await centerOf(grip(page, "red.mp4")));
   await expectOrder(page, ["blue.mp4", "red.mp4", "green.mp4"]);
 });
 
@@ -231,7 +247,7 @@ test("テキストの場面の行の余白(説明の文字の右側)をつかん
     return { inRow: element?.closest("li")?.textContent?.includes("テキストの場面") ?? false, button: !!element?.closest("button"), overText };
   }, start);
   expect(hit).toEqual({ inRow: true, button: false, overText: false });
-  const target = await centerOf(handle(page, "blue.mp4"));
+  const target = await centerOf(grip(page, "blue.mp4"));
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -252,7 +268,7 @@ test("行の中のボタンは、動かさずに押せばドラッグになら�
   await expect(announcement(page)).not.toHaveText(/置きました|つかみました/);
 });
 
-test("行の中のボタンでスペースキーを押しても、ドラッグは始まらずボタンとして働く(キーボードはつまみからだけ)", async ({
+test("行の中のボタンでスペースキーを押しても、ドラッグは始まらずボタンとして働く(キーボードは行そのものからだけ)", async ({
   page,
 }) => {
   await uploadThree(page);
@@ -270,7 +286,7 @@ test("行の中のボタンの上で押して大きく動かすとドラッグ�
   await drag(
     page,
     mergeSection(page).getByRole("button", { name: "blue.mp4 を削除" }),
-    await centerOf(handle(page, "red.mp4")),
+    await centerOf(grip(page, "red.mp4")),
   );
 
   await expect(announcement(page)).toHaveText("blue.mp4 を 1 番目に置きました。");

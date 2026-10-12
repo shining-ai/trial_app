@@ -298,7 +298,7 @@ body {
   counter-increment: merge-item;
   display: grid;
   gap: 10px;
-  padding: 12px 14px 12px 84px;
+  padding: 12px 14px 12px 52px;
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -370,26 +370,6 @@ body {
 
 /* ---- ドラッグでの並べ替え ---- */
 
-.drag-handle {
-  position: absolute;
-  left: 44px;
-  top: 12px;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 14px;
-  letter-spacing: -3px;
-  line-height: 1;
-  cursor: grab;
-}
-
 /* 行(パネル)のどこからでもドラッグできる(マウス・タッチ)。
    長押しでドラッグを始めるため、長押しの間の文字の選択・メニューを出さない。
    touch-action: none にすると、長押しでない指の動きでスクロールできなくなるので使わない */
@@ -401,6 +381,11 @@ body {
   -webkit-touch-callout: none;
 }
 
+.merge-item--draggable:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
 .merge-item--draggable .btn:not(:disabled) {
   cursor: pointer;
 }
@@ -410,26 +395,9 @@ body {
   cursor: grabbing;
 }
 
-.drag-handle:hover:not(:disabled) {
-  background: var(--surface-muted);
-  border-color: var(--border);
-  color: var(--text);
-}
 
-.drag-handle:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-}
 
-.drag-handle:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
 
-.drag-handle[aria-pressed="true"] {
-  cursor: grabbing;
-  color: var(--accent);
-}
 
 .merge-item--dragging {
   z-index: 2;

@@ -98,7 +98,7 @@ test("結合中は並べ替え・削除・挿入のボタンがすべて押せ�
   renderList({ disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(22); // 3行 x (つまみ + 移動4 + 削除 + 挿入) + 先頭への挿入
+  expect(buttons).toHaveLength(19); // 3行 x (移動4 + 削除 + 挿入) + 先頭への挿入
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
 
@@ -286,7 +286,7 @@ test("結合中は、テキストの場面を含む一覧の挿入・編集・�
   renderList({ items: WITH_SCENE, disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(23); // 先頭への挿入1 + 動画2行 x 7 + テキストの場面の行 8(どの行もつまみを含む)
+  expect(buttons).toHaveLength(20); // 先頭への挿入1 + 動画2行 x 6 + テキストの場面の行 7
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
 
@@ -294,55 +294,46 @@ test("結合中は、テキストの場面を含む一覧の挿入・編集・�
 const INSTRUCTIONS =
   "並べ替えるには、スペースキーでつかみ、上下の矢印キーで動かし、もう一度スペースキーで置きます。Esc キーで取り消します。";
 
-test("各行に「{名前} をドラッグして並べ替え」のつまみがあり、役割の説明と操作の説明が日本語", () => {
+test("各行(li)が、そのままつかめる項目になる: 役割の説明と操作の説明が日本語で、フォーカスでき、listitem のまま", () => {
   renderList({ items: WITH_SCENE });
 
-  const handles = [
-    screen.getByRole("button", { name: "A.mp4 をドラッグして並べ替え" }),
-    screen.getByRole("button", { name: `${SCENE_LABEL} をドラッグして並べ替え` }),
-    screen.getByRole("button", { name: "B.mp4 をドラッグして並べ替え" }),
-  ];
-
-  for (const handle of handles) {
-    expect(handle.getAttribute("aria-roledescription")).toBe("並べ替えできる項目");
-    const describedBy = handle.getAttribute("aria-describedby");
+  const rows = rowsOf();
+  expect(rows).toHaveLength(3);
+  for (const row of rows) {
+    expect(row.getAttribute("role")).toBe("listitem");
+    expect(row.getAttribute("aria-roledescription")).toBe("並べ替えできる項目");
+    expect(row.getAttribute("tabindex")).toBe("0");
+    const describedBy = row.getAttribute("aria-describedby");
     expect(describedBy).not.toBeNull();
     expect(document.getElementById(describedBy!)?.textContent).toBe(INSTRUCTIONS);
   }
 });
 
-test("ドラッグの属性はつまみにだけ付き、行(li)には付かない", () => {
+test("つまみのボタンはない(行のどこでもつかめるため)", () => {
   renderList({ items: WITH_SCENE });
 
-  for (const row of rowsOf()) {
-    expect(row.getAttribute("aria-roledescription")).toBeNull();
-    expect(row.getAttribute("tabindex")).toBeNull();
-    expect(row.getAttribute("aria-describedby")).toBeNull();
-  }
+  expect(screen.queryAllByRole("button", { name: /ドラッグして並べ替え/ })).toEqual([]);
 });
 
-test("入力欄が開いている間は、どの行のつまみも押せない(編集中の行のつまみも表示されて押せない)", () => {
-  renderList({ items: WITH_SCENE, editor: { mode: "edit", id: "text-1" } });
+test("入力欄が開いている間は、どの行もフォーカスで止まらず(つかめない)、行の中の入力欄を無効扱いにする aria-disabled も付けない", () => {
+  renderList({ items: WITH_SCENE, editor: { mode: "insert", afterId: "id-A" } });
 
-  const handles = screen.getAllByRole("button", { name: /をドラッグして並べ替え$/ }) as HTMLButtonElement[];
-  expect(handles).toHaveLength(3);
-  expect(handles.every((handle) => handle.disabled)).toBe(true);
+  expect(rowsOf().map((row) => row.getAttribute("tabindex"))).toEqual([null, null, null]);
+  expect(rowsOf().map((row) => row.getAttribute("aria-disabled"))).toEqual([null, null, null]);
+  expect((screen.getByLabelText("テキスト") as HTMLTextAreaElement).closest("[aria-disabled='true']")).toBeNull();
 });
 
-test("結合中は、つまみが押せない", () => {
+test("結合中は、どの行もフォーカスで止まらない(つかめない)", () => {
   renderList({ disabled: true });
 
-  const handles = screen.getAllByRole("button", { name: /をドラッグして並べ替え$/ }) as HTMLButtonElement[];
-  expect(handles).toHaveLength(3);
-  expect(handles.every((handle) => handle.disabled)).toBe(true);
+  expect(rowsOf().map((row) => row.getAttribute("tabindex"))).toEqual([null, null, null]);
+  expect(rowsOf().map((row) => row.getAttribute("aria-disabled"))).toEqual([null, null, null]);
 });
 
-test("1件だけの一覧でもつまみがあり、押せる", () => {
+test("1件だけの一覧でも行をつかめる(フォーカスで止まる)", () => {
   renderList({ items: [video("A")] });
 
-  expect((screen.getByRole("button", { name: "A.mp4 をドラッグして並べ替え" }) as HTMLButtonElement).disabled).toBe(
-    false,
-  );
+  expect(rowsOf().map((row) => row.getAttribute("tabindex"))).toEqual(["0"]);
 });
 
 /**
@@ -361,9 +352,9 @@ function recordAnnouncements(): { texts: string[]; stop: () => void } {
   return { texts, stop: () => observer.disconnect() };
 }
 
-test("キーボード: つまみで Space を押すとつかんだことを読み上げ、Escape で取り消しを読み上げ、並べ替えは起きない", async () => {
+test("キーボード: 行にフォーカスして Space を押すとつかんだことを読み上げ、Escape で取り消しを読み上げ、並べ替えは起きない", async () => {
   const props = renderList();
-  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const handle = rowsOf()[2];
   const announcements = recordAnnouncements();
 
   handle.focus();
@@ -379,9 +370,9 @@ test("キーボード: つまみで Space を押すとつかんだことを読�
   expect(props.onMoveById).not.toHaveBeenCalled();
 });
 
-test("キーボード: 入力欄が開いている間は、つまみで Space を押してもつかまない(読み上げが出ない)", async () => {
+test("キーボード: 入力欄が開いている間は、行で Space を押してもつかまない(読み上げが出ない)", async () => {
   renderList({ editor: { mode: "insert", afterId: null } });
-  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const handle = rowsOf()[2];
   const announcements = recordAnnouncements();
 
   fireEvent.keyDown(handle, { code: "Space", key: " " });
@@ -396,7 +387,7 @@ test.each([
   ["入力欄が開いた", { editor: { mode: "insert" as const, afterId: null } }],
 ])("キーボードでつかんでいる間に%sら、ドラッグを取り消し、そのあとスペースを押しても並べ替えない", async (_, lock) => {
   const props = renderList();
-  const handle = screen.getByRole("button", { name: "C.mp4 をドラッグして並べ替え" });
+  const handle = rowsOf()[2];
   const announcements = recordAnnouncements();
   handle.focus();
   fireEvent.keyDown(handle, { code: "Space", key: " " });
@@ -413,10 +404,10 @@ test.each([
   expect(announcements.texts.some((text) => text.includes("置きました"))).toBe(false);
 });
 
-test("HTML の特殊文字を含む名前も、つまみの名前と読み上げにそのまま文字として出て、要素は作られない", async () => {
+test("HTML の特殊文字を含む名前も、読み上げにそのまま文字として出て、要素は作られない", async () => {
   const name = '<img src=x onerror="alert(1)">.mp4';
   renderList({ items: [{ ...video("A"), file_name: name }, video("B")] });
-  const handle = screen.getByRole("button", { name: `${name} をドラッグして並べ替え` });
+  const handle = rowsOf()[0];
   const announcements = recordAnnouncements();
 
   handle.focus();
