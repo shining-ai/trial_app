@@ -214,7 +214,7 @@ test("先頭への挿入の入力欄は、一覧の上に開く", () => {
   const list = screen.getByRole("list");
   expect(list.contains(field)).toBe(false);
   expect(field.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect((screen.getByLabelText("表示時間(秒)") as HTMLInputElement).value).toBe("3.0");
+  expect((screen.getByLabelText("表示時間(秒)") as HTMLInputElement).value).toBe("1.0");
 });
 
 test("行の後への挿入の入力欄は、その行のすぐ下(同じ行の中)に開く", () => {
@@ -225,6 +225,7 @@ test("行の後への挿入の入力欄は、その行のすぐ下(同じ行の�
   expect(within(rows[1]).queryByLabelText("テキスト")).toBeNull();
   expect(within(rows[2]).queryByLabelText("テキスト")).toBeNull();
   expect(screen.getAllByLabelText("テキスト")).toHaveLength(1);
+  expect((within(rows[0]).getByLabelText("表示時間(秒)") as HTMLInputElement).value).toBe("1.0");
 });
 
 test("編集の入力欄は、その行の位置に今のテキストと表示時間を入れて開く", () => {
@@ -244,7 +245,8 @@ test("入力欄の確定と取り消しが、親への通知になる", () => {
   fireEvent.click(screen.getByRole("button", { name: "確定" }));
   fireEvent.click(screen.getByRole("button", { name: "取り消し" }));
 
-  expect(props.onConfirmText).toHaveBeenCalledWith("京都", 30);
+  // 表示時間を直さずに確定したので、新規の初期値の1.0秒(10)
+  expect(props.onConfirmText).toHaveBeenCalledWith("京都", 10);
   expect(props.onCloseEditor).toHaveBeenCalledTimes(1);
 });
 

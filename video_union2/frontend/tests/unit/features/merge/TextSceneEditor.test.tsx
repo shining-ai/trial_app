@@ -9,7 +9,7 @@ const DURATION_MESSAGE = "表示時間は1秒から60秒までで、小数第1�
 function renderEditor(overrides: Partial<Parameters<typeof TextSceneEditor>[0]> = {}) {
   const props = {
     initialText: "",
-    initialDuration: "3.0",
+    initialDuration: "1.0",
     error: null,
     onConfirm: vi.fn(),
     onCancel: vi.fn(),
@@ -31,7 +31,7 @@ function type(element: HTMLElement, value: string) {
   fireEvent.change(element, { target: { value } });
 }
 
-test("テキストは複数行の入力欄、表示時間は小数向けの文字入力欄で、新規の初期値は「3.0」", () => {
+test("テキストは複数行の入力欄、表示時間は小数向けの文字入力欄で、新規の初期値は「1.0」", () => {
   renderEditor();
 
   expect(textarea().tagName).toBe("TEXTAREA");
@@ -39,7 +39,7 @@ test("テキストは複数行の入力欄、表示時間は小数向けの文�
   expect(duration().tagName).toBe("INPUT");
   expect(duration().type).toBe("text");
   expect(duration().inputMode).toBe("decimal");
-  expect(duration().value).toBe("3.0");
+  expect(duration().value).toBe("1.0");
 });
 
 test("編集では、渡された今のテキストと表示時間が入っている", () => {
@@ -123,13 +123,13 @@ test("正しい入力で「確定」を押すと、正規化済みのテキス�
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
-test("表示時間を直さずに確定すると、初期値の「3.0」が30として渡る", () => {
+test("表示時間を直さずに確定すると、初期値の「1.0」が10として渡る", () => {
   const props = renderEditor();
   type(textarea(), "京都");
 
   fireEvent.click(screen.getByRole("button", { name: "確定" }));
 
-  expect(props.onConfirm).toHaveBeenCalledWith("京都", 30);
+  expect(props.onConfirm).toHaveBeenCalledWith("京都", 10);
 });
 
 test("理由が出たあとに直して「確定」を押すと、前の理由は消えて onConfirm が呼ばれる", () => {
@@ -142,7 +142,7 @@ test("理由が出たあとに直して「確定」を押すと、前の理由�
   fireEvent.click(screen.getByRole("button", { name: "確定" }));
 
   expect(screen.queryByText("1行は20文字までです(1行目が21文字)")).toBeNull();
-  expect(props.onConfirm).toHaveBeenCalledWith("あ".repeat(20), 30);
+  expect(props.onConfirm).toHaveBeenCalledWith("あ".repeat(20), 10);
 });
 
 test("「取り消し」で onCancel が呼ばれ、onConfirm は呼ばれない", () => {

@@ -16,7 +16,7 @@ const MOVE_BUTTONS: { direction: MoveDirection; label: string }[] = [
   { direction: "bottom", label: "末尾へ" },
 ];
 
-const DEFAULT_DURATION = "3.0";
+const DEFAULT_DURATION = "1.0";
 
 function formatTenths(durationTenths: number): string {
   return `${Math.floor(durationTenths / 10)}.${durationTenths % 10}`;

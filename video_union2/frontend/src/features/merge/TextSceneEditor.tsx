@@ -5,7 +5,7 @@ import { parseSceneDuration } from "./parseSceneDuration";
 
 export function TextSceneEditor(props: {
   initialText: string;
-  /** 表示時間の欄の初期値(例: "3.0") */
+  /** 表示時間の欄の初期値(例: "1.0") */
   initialDuration: string;
   /** 外から渡される理由(挿入する位置がなくなった、など) */
   error: string | null;

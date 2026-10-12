@@ -230,7 +230,7 @@ test("テキストの場面の行の余白(説明の文字の右側)をつかん
   await mergeSection(page).getByRole("button", { name: "red.mp4 の後にテキストを挿入" }).click();
   await mergeSection(page).getByLabel("テキスト", { exact: true }).fill("■");
   await mergeSection(page).getByRole("button", { name: "確定" }).click();
-  await expectOrder(page, ["red.mp4", "📝 ■(3.0秒)", "blue.mp4"]);
+  await expectOrder(page, ["red.mp4", "📝 ■(1.0秒)", "blue.mp4"]);
   // 説明の文字「テキストの場面」と同じ高さで、行の右端から60ピクセル内側の余白
   // (その位置がこの行の中で、ボタンでも文字でもないことを確かめてから押す)
   const row = rows(page).nth(1);
@@ -256,7 +256,7 @@ test("テキストの場面の行の余白(説明の文字の右側)をつかん
   await page.mouse.move(target.x, target.y + 2, { steps: 2 });
   await page.mouse.up();
 
-  await expectOrder(page, ["red.mp4", "blue.mp4", "📝 ■(3.0秒)"]);
+  await expectOrder(page, ["red.mp4", "blue.mp4", "📝 ■(1.0秒)"]);
 });
 
 test("行の中のボタンは、動かさずに押せばドラッグにならずボタンとして働く", async ({ page }) => {
