@@ -1,17 +1,22 @@
 from fastapi import APIRouter, Request
 
 from app.features.merge.merge_job_store import MergeJob
-from app.features.merge.schemas import ErrorDetail, MergeJobResponse, MergeRequest
+from app.features.merge.parse_merge_request import parse_merge_request
+from app.features.merge.read_limited_body import read_limited_body
+from app.features.merge.schemas import ErrorDetail, MergeJobResponse
 from app.features.merge.start_merge import start_merge
 from app.lib.errors import AppError
 
 router = APIRouter()
 
+_MAX_BODY_BYTES = 1024 * 1024
+
 
 @router.post("/api/merges", status_code=202, response_model=MergeJobResponse)
-async def post_merge(body: MergeRequest, request: Request) -> MergeJobResponse:
+async def post_merge(request: Request) -> MergeJobResponse:
     state = request.app.state
-    return _to_response(start_merge(body.video_ids, state.settings, state.storage, state.merge_jobs))
+    body = parse_merge_request(await read_limited_body(request.stream(), _MAX_BODY_BYTES))
+    return _to_response(start_merge(body.items, state.settings, state.storage, state.merge_jobs, state.scene_font))
 
 
 @router.get("/api/merges/{job_id}", response_model=MergeJobResponse)

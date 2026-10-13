@@ -4,7 +4,7 @@ from tests.support.make_video import make_video
 
 
 def _merge(client, ids):
-    return client.post("/api/merges", json={"video_ids": ids}).json()["id"]
+    return client.post("/api/merges", json={"items": [{"type": "video", "video_id": i} for i in ids]}).json()["id"]
 
 
 def test_completed_result_is_downloaded_as_attachment(client, settings, tmp_path):

@@ -1,3 +1,6 @@
+import subprocess
+
+from tests.support.bright_bbox import bright_bbox
 from tests.support.make_video import make_still_png, make_video
 from tests.support.probe import audio_streams, frame_timestamps, probe, video_stream
 from tests.support.sample_pixel import is_close, sample_pixel
@@ -53,3 +56,36 @@ def test_make_still_png_creates_png(tmp_path):
     info = probe(make_still_png(tmp_path / "a.png"))
 
     assert info["format"]["format_name"] == "png_pipe"
+
+
+def _make_box_video(path, *, x, y, w, h):
+    """黒地に白い四角を描いた1秒の動画を FFmpeg で作る。"""
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+            "-i", "color=c=black:s=320x180:r=30:d=1",
+            "-vf", f"drawbox=x={x}:y={y}:w={w}:h={h}:color=white:t=fill",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return path
+
+
+def test_bright_bbox_returns_none_for_solid_black_video(tmp_path):
+    path = make_video(tmp_path / "a.mp4", color="black", audio=False)
+
+    assert bright_bbox(path, at_seconds=0.5) is None
+
+
+def test_bright_bbox_returns_position_of_white_box_on_black(tmp_path):
+    path = _make_box_video(tmp_path / "box.mp4", x=100, y=50, w=40, h=30)
+
+    left, top, right, bottom = bright_bbox(path, at_seconds=0.5)
+
+    # 四角は x=100..139、y=50..79 の画素(右と下は含む座標)。圧縮のずれは ±2 まで許す
+    assert abs(left - 100) <= 2
+    assert abs(top - 50) <= 2
+    assert abs(right - 139) <= 2
+    assert abs(bottom - 79) <= 2

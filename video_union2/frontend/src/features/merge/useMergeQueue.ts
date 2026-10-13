@@ -1,34 +1,124 @@
 import { useCallback, useRef, useState } from "react";
 import { ApiError } from "../../lib/apiClient";
+import { countVideoItems } from "./countVideoItems";
 import { deleteVideo } from "./deleteVideo";
+import { insertDateHeadings as insertDateHeadingsInto } from "./insertDateHeadings";
+import { insertItemAfter } from "./insertItemAfter";
+import { sortByShootingDateTime } from "./sortByShootingDateTime";
 import { moveItem, type MoveDirection } from "./moveItem";
-import { sumDurationMilliseconds } from "./sumDurationMilliseconds";
-import type { MergeItem } from "./types";
+import { moveItemById } from "./moveItemById";
+import { replaceItem } from "./replaceItem";
+import { restoreRemovedItem } from "./restoreRemovedItem";
+import { sumMergeItemsMilliseconds } from "./sumMergeItemsMilliseconds";
+import type { MergeItem, TextSceneItem, VideoItem } from "./types";
 
 const DELETE_FAILED_MESSAGE = "削除に失敗しました";
+const INSERT_TARGET_GONE_MESSAGE = "挿入する位置の項目がなくなりました。取り消して、もう一度挿入してください";
+
+/** 入力欄の状態。挿入の位置は直前の項目の id で持つ(先頭は null)。 */
+export type TextEditor = { mode: "insert"; afterId: string | null } | { mode: "edit"; id: string } | null;
 
 export function useMergeQueue() {
   const [items, setItems] = useState<MergeItem[]>([]);
+  const [editor, setEditor] = useState<TextEditor>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
   // 削除に失敗したとき元の位置に戻すため、最新の一覧を同期的に参照できるようにしておく
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const textSceneCount = useRef(0);
 
-  const addItem = useCallback((item: MergeItem) => {
+  const addItem = useCallback((item: VideoItem) => {
     setItems((current) => [...current, item]);
   }, []);
 
   const move = useCallback((index: number, direction: MoveDirection) => {
+    if (editorRef.current) return;
     setItems((current) => moveItem(current, index, direction));
   }, []);
 
+  /** ドラッグで、activeId の項目を overId の項目の位置へ動かす。番号ではなく id で並べ替える(削除の待ち中もずれない)。 */
+  const moveById = useCallback((activeId: string, overId: string) => {
+    if (editorRef.current) return;
+    setItems((latest) => moveItemById(latest, activeId, overId));
+  }, []);
+
+  /** ファイル名の撮影日時の古い順に並べる(見出しは後ろの動画と一緒に動き、日付の見出しはその日の最初の動画の前へ置き直す) */
+  const sortByShootingTime = useCallback(() => {
+    if (editorRef.current) return;
+    setItems((latest) => sortByShootingDateTime(latest));
+  }, []);
+
+  /** 撮影日が変わるたびに日付の見出しを入れる(既にある日付の見出しは作り直さずに移し、同じ日付は1つにまとめる) */
+  const insertDateHeadings = useCallback(() => {
+    if (editorRef.current) return;
+    setItems((latest) =>
+      insertDateHeadingsInto(latest, () => {
+        textSceneCount.current += 1;
+        return `text-${textSceneCount.current}`;
+      }),
+    );
+  }, []);
+
+  const openInsert = useCallback((afterId: string | null) => {
+    setEditorError(null);
+    editorRef.current = { mode: "insert", afterId };
+    setEditor(editorRef.current);
+  }, []);
+
+  const openEdit = useCallback((id: string) => {
+    setEditorError(null);
+    editorRef.current = { mode: "edit", id };
+    setEditor(editorRef.current);
+  }, []);
+
+  const closeEditor = useCallback(() => {
+    setEditorError(null);
+    editorRef.current = null;
+    setEditor(null);
+  }, []);
+
+  const confirmText = useCallback((text: string, durationTenths: number) => {
+    const current = editorRef.current;
+    if (!current) return;
+    // 一覧の更新は関数で行う(画面に反映される前のアップロードの追加や、削除の失敗の戻しを上書きしないため)
+    if (current.mode === "edit") {
+      const edited: TextSceneItem = { kind: "text", id: current.id, text, durationTenths };
+      setItems((latest) => replaceItem(latest, current.id, edited));
+    } else {
+      const { afterId } = current;
+      if (afterId !== null && !itemsRef.current.some((item) => item.id === afterId)) {
+        setEditorError(INSERT_TARGET_GONE_MESSAGE);
+        return;
+      }
+      textSceneCount.current += 1;
+      const inserted: TextSceneItem = { kind: "text", id: `text-${textSceneCount.current}`, text, durationTenths };
+      // 直前の項目は上で確かめ済み。万一見つからなくても、入力した見出しを失わないよう末尾に入れる
+      setItems((latest) => insertItemAfter(latest, afterId, inserted) ?? [...latest, inserted]);
+    }
+    setEditorError(null);
+    editorRef.current = null;
+    setEditor(null);
+  }, []);
+
   const removeItem = useCallback(async (id: string): Promise<string | null> => {
+    if (editorRef.current) return null;
     // 削除の完了を待つあいだに結合を始めても、その動画が含まれないよう、先に一覧から外す
-    const index = itemsRef.current.findIndex((item) => item.id === id);
-    const removed = index < 0 ? null : { item: itemsRef.current[index], index };
-    const remaining = itemsRef.current.filter((item) => item.id !== id);
-    itemsRef.current = remaining;
-    setItems(remaining);
+    const before = itemsRef.current;
+    const index = before.findIndex((item) => item.id === id);
+    const removed =
+      index < 0
+        ? null
+        : {
+            item: before[index],
+            position: { previousId: before[index - 1]?.id ?? null, nextId: before[index + 1]?.id ?? null, index },
+          };
+    itemsRef.current = before.filter((item) => item.id !== id);
+    setItems((latest) => latest.filter((item) => item.id !== id));
+    // テキストの場面はサーバーに保存していないので、一覧から外すだけでよい
+    if (removed?.item.kind === "text") return null;
     try {
       await deleteVideo(id);
     } catch (error) {
@@ -37,7 +127,7 @@ export function useMergeQueue() {
         return null;
       }
       if (removed) {
-        setItems((current) => [...current.slice(0, removed.index), removed.item, ...current.slice(removed.index)]);
+        setItems((latest) => restoreRemovedItem(latest, removed.item, removed.position));
       }
       const message = error instanceof ApiError ? error.message : DELETE_FAILED_MESSAGE;
       setDeleteError(message);
@@ -49,11 +139,20 @@ export function useMergeQueue() {
 
   return {
     items,
-    videoIds: items.map((item) => item.id),
-    totalSeconds: sumDurationMilliseconds(items.map((item) => item.duration_seconds)) / 1000,
+    editor,
+    videoCount: countVideoItems(items),
+    totalSeconds: sumMergeItemsMilliseconds(items) / 1000,
     deleteError,
+    editorError,
     addItem,
     move,
+    moveById,
+    sortByShootingTime,
+    insertDateHeadings,
     removeItem,
+    openInsert,
+    openEdit,
+    closeEditor,
+    confirmText,
   };
 }

@@ -15,13 +15,24 @@ export function UploadForm(props: {
     onSelect(files);
   }
 
+  const disabled = remainingSlots <= 0;
+
   return (
-    <div>
-      <label>
-        動画ファイルを選択
-        <input type="file" accept="video/*" multiple disabled={remainingSlots <= 0} onChange={handleChange} />
+    <div className="upload-form">
+      <label className={`file-picker${disabled ? " file-picker--disabled" : ""}`}>
+        <span className="file-picker__label">動画ファイルを選択</span>
+        <span className="file-picker__hint">クリックして選ぶ(複数可・あと{remainingSlots}本)</span>
+        <input
+          className="visually-hidden"
+          type="file"
+          accept="video/*"
+          multiple
+          aria-label="動画ファイルを選択"
+          disabled={disabled}
+          onChange={handleChange}
+        />
       </label>
-      {remainingSlots <= 0 || showLimitNotice ? <p>{LIMIT_MESSAGE}</p> : null}
+      {disabled || showLimitNotice ? <p className="message message--notice">{LIMIT_MESSAGE}</p> : null}
     </div>
   );
 }

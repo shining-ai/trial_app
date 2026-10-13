@@ -45,6 +45,9 @@ class DiskStorage:
     def merge_part_path(self, job_id: str, index: int) -> Path:
         return self._inside(self.merge_parts_dir(job_id) / f"{index:04d}.mp4")
 
+    def merge_text_image_path(self, job_id: str, index: int) -> Path:
+        return self._inside(self.merge_parts_dir(job_id) / f"{index:04d}.png")
+
     def merge_list_path(self, job_id: str) -> Path:
         return self._inside(self.merge_job_dir(job_id) / "parts.txt")
 

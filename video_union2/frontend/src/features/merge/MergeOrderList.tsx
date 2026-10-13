@@ -1,0 +1,208 @@
+import type { ReactNode } from "react";
+import { formatDuration } from "../../lib/formatDuration";
+import type { MoveDirection } from "./moveItem";
+import { itemName } from "./itemName";
+import { SortableMergeItem } from "./SortableMergeItem";
+import { SortableMergeList } from "./SortableMergeList";
+import { summarizeSceneText } from "./summarizeSceneText";
+import { TextSceneEditor } from "./TextSceneEditor";
+import type { MergeItem, TextSceneItem } from "./types";
+import type { TextEditor } from "./useMergeQueue";
+
+const MOVE_BUTTONS: { direction: MoveDirection; label: string }[] = [
+  { direction: "up", label: "上へ" },
+  { direction: "down", label: "下へ" },
+  { direction: "top", label: "先頭へ" },
+  { direction: "bottom", label: "末尾へ" },
+];
+
+const DEFAULT_DURATION = "1.0";
+
+function formatTenths(durationTenths: number): string {
+  return `${Math.floor(durationTenths / 10)}.${durationTenths % 10}`;
+}
+
+export function MergeOrderList(props: {
+  items: MergeItem[];
+  editor: TextEditor;
+  editorError: string | null;
+  /** 結合中 */
+  disabled: boolean;
+  deleteError: string | null;
+  onMove: (index: number, direction: MoveDirection) => void;
+  onRemove: (id: string) => void;
+  onOpenInsert: (afterId: string | null) => void;
+  onOpenEdit: (id: string) => void;
+  onConfirmText: (text: string, durationTenths: number) => void;
+  onCloseEditor: () => void;
+  /** ドラッグで、activeId の項目を overId の項目の位置へ動かす */
+  onMoveById: (activeId: string, overId: string) => void;
+  /** ファイル名の撮影日時の順に並べる */
+  onSortByShootingTime: () => void;
+  /** 撮影日ごとに日付の見出しを入れる */
+  onInsertDateHeadings: () => void;
+}) {
+  const { items, editor, editorError, disabled, deleteError, onMove, onRemove } = props;
+  const { onOpenInsert, onOpenEdit, onConfirmText, onCloseEditor, onMoveById } = props;
+  const { onSortByShootingTime, onInsertDateHeadings } = props;
+  const lastIndex = items.length - 1;
+  const hasVideo = items.some((item) => item.kind === "video");
+  // 結合中と、入力欄が開いている間は、入力欄以外の操作をすべて止める(入力中に並びが変わらないようにする)
+  const locked = disabled || editor !== null;
+  // 挿入の直前の項目がなくなったときも、取り消せるよう入力欄を一覧の下に出す
+  const insertTargetMissing =
+    editor?.mode === "insert" && editor.afterId !== null && !items.some((item) => item.id === editor.afterId);
+
+  function renderEditor(initial: { text: string; duration: string }) {
+    return (
+      <TextSceneEditor
+        initialText={initial.text}
+        initialDuration={initial.duration}
+        error={editorError}
+        onConfirm={onConfirmText}
+        onCancel={onCloseEditor}
+      />
+    );
+  }
+
+  function renderMoveButtons(index: number, name: string): ReactNode {
+    return MOVE_BUTTONS.map(({ direction, label }) => {
+      const atEdge = direction === "up" || direction === "top" ? index === 0 : index === lastIndex;
+      return (
+        <button
+          key={direction}
+          type="button"
+          className="btn btn--ghost"
+          aria-label={`${name} を${label}`}
+          disabled={locked || atEdge}
+          onClick={() => onMove(index, direction)}
+        >
+          {label}
+        </button>
+      );
+    });
+  }
+
+  function renderInsertButton(item: MergeItem, name: string): ReactNode {
+    return (
+      <button
+        type="button"
+        className="btn btn--add"
+        aria-label={`${name} の後にテキストを挿入`}
+        disabled={locked}
+        onClick={() => onOpenInsert(item.id)}
+      >
+        この後にテキストを挿入
+      </button>
+    );
+  }
+
+  function renderTextScene(item: TextSceneItem, index: number): ReactNode {
+    const { firstLine, hasMore } = summarizeSceneText(item.text);
+    const name = itemName(item);
+    return (
+      <div className="merge-item__row">
+        <div className="merge-item__main">
+          <span role="img" aria-label={name} className="merge-item__name">
+            {`📝 ${firstLine}${hasMore ? "…" : ""}(${formatTenths(item.durationTenths)}秒)`}
+          </span>
+          <span className="merge-item__meta">テキストの場面</span>
+        </div>{" "}
+        <div className="merge-item__actions">
+          {renderMoveButtons(index, name)}
+          <button
+            type="button"
+            className="btn btn--ghost"
+            aria-label={`${name} を編集`}
+            disabled={locked}
+            onClick={() => onOpenEdit(item.id)}
+          >
+            編集
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--danger"
+            aria-label={`${name} を削除`}
+            disabled={locked}
+            onClick={() => onRemove(item.id)}
+          >
+            削除
+          </button>{" "}
+          {renderInsertButton(item, name)}
+        </div>
+      </div>
+    );
+  }
+
+  function renderVideo(item: MergeItem & { kind: "video" }, index: number): ReactNode {
+    return (
+      <div className="merge-item__row">
+        <div className="merge-item__main">
+          <span className="merge-item__name">{item.file_name}</span>{" "}
+          <span className="merge-item__meta">{`${formatDuration(item.duration_seconds)} / ${item.width}x${item.height}`}</span>
+        </div>{" "}
+        <div className="merge-item__actions">
+          {renderMoveButtons(index, itemName(item))}
+          <button
+            type="button"
+            className="btn btn--ghost btn--danger"
+            aria-label={`${itemName(item)} を削除`}
+            disabled={locked}
+            onClick={() => onRemove(item.id)}
+          >
+            削除
+          </button>{" "}
+          {renderInsertButton(item, itemName(item))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="merge-list-area">
+      <div className="merge-list__head">
+        <button type="button" className="btn btn--add" disabled={locked} onClick={() => onOpenInsert(null)}>
+          先頭にテキストを挿入
+        </button>
+        <button type="button" className="btn" disabled={locked || !hasVideo} onClick={onSortByShootingTime}>
+          撮影日時の順に並べる
+        </button>
+        <button type="button" className="btn" disabled={locked || !hasVideo} onClick={onInsertDateHeadings}>
+          撮影日ごとに見出しを入れる
+        </button>
+      </div>
+      {editor?.mode === "insert" && editor.afterId === null
+        ? renderEditor({ text: "", duration: DEFAULT_DURATION })
+        : null}
+      <SortableMergeList items={items} locked={locked} onMoveById={onMoveById}>
+        {items.map((item, index) => {
+          const editing = editor?.mode === "edit" && editor.id === item.id && item.kind === "text";
+          return (
+            <SortableMergeItem
+              key={item.id}
+              id={item.id}
+              name={itemName(item)}
+              locked={locked}
+              className={`merge-item${item.kind === "text" ? " merge-item--text" : ""}`}
+            >
+              {editing
+                ? renderEditor({ text: item.text, duration: formatTenths(item.durationTenths) })
+                : item.kind === "text"
+                  ? renderTextScene(item, index)
+                  : renderVideo(item, index)}
+              {editor?.mode === "insert" && editor.afterId === item.id
+                ? renderEditor({ text: "", duration: DEFAULT_DURATION })
+                : null}
+            </SortableMergeItem>
+          );
+        })}
+      </SortableMergeList>
+      {insertTargetMissing ? renderEditor({ text: "", duration: DEFAULT_DURATION }) : null}
+      {deleteError ? (
+        <p role="alert" className="message message--error">
+          {deleteError}
+        </p>
+      ) : null}
+    </div>
+  );
+}

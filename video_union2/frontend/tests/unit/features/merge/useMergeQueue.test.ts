@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { deleteVideo } from "../../../../src/features/merge/deleteVideo";
-import type { MergeItem } from "../../../../src/features/merge/types";
+import type { MergeItem, VideoItem } from "../../../../src/features/merge/types";
 import { checkMergeable } from "../../../../src/features/merge/checkMergeable";
 import { useMergeQueue } from "../../../../src/features/merge/useMergeQueue";
 import { ApiError } from "../../../../src/lib/apiClient";
@@ -9,8 +9,12 @@ import { ApiError } from "../../../../src/lib/apiClient";
 // 削除の成功・失敗をテストから制御するため、deleteVideo だけを差し替える
 vi.mock("../../../../src/features/merge/deleteVideo", () => ({ deleteVideo: vi.fn() }));
 
-function video(id: string, seconds: number): MergeItem {
-  return { id, file_name: `${id}.mp4`, duration_seconds: seconds, width: 640, height: 360 };
+function video(id: string, seconds: number): VideoItem {
+  return { kind: "video", id, file_name: `${id}.mp4`, duration_seconds: seconds, width: 640, height: 360 };
+}
+
+function ids(result: { current: { items: MergeItem[] } }): string[] {
+  return result.current.items.map((item) => item.id);
 }
 
 beforeEach(() => {
@@ -22,7 +26,7 @@ afterEach(() => {
   vi.mocked(deleteVideo).mockReset();
 });
 
-test("追加した順に並び、videoIds と totalSeconds に反映される", () => {
+test("追加した順に並び、totalSeconds に反映される", () => {
   const { result } = renderHook(() => useMergeQueue());
 
   act(() => {
@@ -31,7 +35,6 @@ test("追加した順に並び、videoIds と totalSeconds に反映される", 
   });
 
   expect(result.current.items.map((item) => item.id)).toEqual(["a", "b"]);
-  expect(result.current.videoIds).toEqual(["a", "b"]);
   expect(result.current.totalSeconds).toBe(30.5);
 });
 
@@ -50,7 +53,7 @@ test("「削除」で deleteVideo がその項目のIDで呼ばれ、成功し�
   expect(deleteVideo).toHaveBeenCalledTimes(1);
   expect(deleteVideo).toHaveBeenCalledWith("a");
   expect(message).toBeNull();
-  expect(result.current.videoIds).toEqual(["b"]);
+  expect(ids(result)).toEqual(["b"]);
   expect(result.current.deleteError).toBeNull();
 });
 
@@ -68,7 +71,7 @@ test("deleteVideo が404(video_not_found)なら、サーバーにはもうない
   });
 
   expect(message).toBeNull();
-  expect(result.current.videoIds).toEqual(["b"]);
+  expect(ids(result)).toEqual(["b"]);
   expect(result.current.deleteError).toBeNull();
 });
 
@@ -86,7 +89,7 @@ test("deleteVideo が404以外のApiErrorで失敗したら一覧に残り、サ
 
   expect(message).toBe("結合中の動画は削除できません");
   expect(result.current.deleteError).toBe("結合中の動画は削除できません");
-  expect(result.current.videoIds).toEqual(["a"]);
+  expect(ids(result)).toEqual(["a"]);
 });
 
 test("ApiError でない失敗は固定の文言を返し、一覧に残す", async () => {
@@ -102,7 +105,7 @@ test("ApiError でない失敗は固定の文言を返し、一覧に残す", as
   });
 
   expect(message).toBe("削除に失敗しました");
-  expect(result.current.videoIds).toEqual(["a"]);
+  expect(ids(result)).toEqual(["a"]);
 });
 
 test("削除が成功すると、前回の deleteError は消える", async () => {
@@ -135,16 +138,16 @@ test("並べ替えたあとの並び順が、結合を始めるときに渡すID
   act(() => {
     result.current.move(2, "top");
   });
-  expect(result.current.videoIds).toEqual(["c", "a", "b"]);
+  expect(ids(result)).toEqual(["c", "a", "b"]);
 
   act(() => {
     result.current.move(1, "down");
   });
-  expect(result.current.videoIds).toEqual(["c", "b", "a"]);
+  expect(ids(result)).toEqual(["c", "b", "a"]);
 });
 
 function mergeable(totalSeconds: number, count: number) {
-  return checkMergeable({ count, totalSeconds, isMerging: false }).mergeable;
+  return checkMergeable({ videoCount: count, itemCount: count, totalSeconds, isMerging: false, isEditing: false }).mergeable;
 }
 
 test("合計1810秒(超過)の状態から20秒の項目を削除すると、合計1790秒になる。追加しても合計が更新される", async () => {
@@ -196,13 +199,660 @@ test("「削除」を押した時点で一覧から外れ(結合に含まれな�
   act(() => {
     pending = result.current.removeItem("b");
   });
-  expect(result.current.videoIds).toEqual(["a", "c"]);
+  expect(ids(result)).toEqual(["a", "c"]);
   expect(result.current.totalSeconds).toBe(40);
 
   await act(async () => {
     rejectDelete(new ApiError(500, "internal", "削除できませんでした"));
     await pending;
   });
-  expect(result.current.videoIds).toEqual(["a", "b", "c"]);
+  expect(ids(result)).toEqual(["a", "b", "c"]);
   expect(result.current.deleteError).toBe("削除できませんでした");
+});
+
+function textOf(item: MergeItem | undefined): { text: string; durationTenths: number } | null {
+  return item?.kind === "text" ? { text: item.text, durationTenths: item.durationTenths } : null;
+}
+
+function pendingDelete() {
+  const control: { reject: (error: unknown) => void } = { reject: () => {} };
+  vi.mocked(deleteVideo).mockImplementation(
+    () => new Promise((_resolve, reject) => { control.reject = reject; }),
+  );
+  return control;
+}
+
+test("「先頭にテキストを挿入」で確定すると先頭に入り、入力欄が閉じる", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+  });
+
+  act(() => {
+    result.current.openInsert(null);
+  });
+  expect(result.current.editor).toEqual({ mode: "insert", afterId: null });
+  act(() => {
+    result.current.confirmText("京都", 30);
+  });
+
+  expect(result.current.items.map((item) => item.kind)).toEqual(["text", "video", "video"]);
+  expect(textOf(result.current.items[0])).toEqual({ text: "京都", durationTenths: 30 });
+  expect(result.current.editor).toBeNull();
+  expect(result.current.editorError).toBeNull();
+});
+
+test("行1の後に挿入すると2番目に入り、末尾の行の後に挿入すると末尾に入る", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+  });
+
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("一", 30);
+  });
+  expect(result.current.items.map((item) => item.kind)).toEqual(["video", "text", "video"]);
+  expect(result.current.items[0].id).toBe("a");
+  expect(result.current.items[2].id).toBe("b");
+
+  act(() => {
+    result.current.openInsert("b");
+  });
+  act(() => {
+    result.current.confirmText("二", 55);
+  });
+  expect(result.current.items.map((item) => item.kind)).toEqual(["video", "text", "video", "text"]);
+  expect(textOf(result.current.items[3])).toEqual({ text: "二", durationTenths: 55 });
+});
+
+test("テキストの場面の id は確定した順に text-1, text-2 と数える", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("一", 30);
+  });
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("二", 30);
+  });
+
+  expect(ids(result)).toEqual(["text-2", "text-1", "a"]);
+});
+
+test("編集で文言と表示時間を変えると、同じ位置・同じ id のまま置き換わり、入力欄が閉じる", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("旧", 30);
+  });
+
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+  expect(result.current.editor).toEqual({ mode: "edit", id: "text-1" });
+  act(() => {
+    result.current.confirmText("新", 20);
+  });
+
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+  expect(textOf(result.current.items[1])).toEqual({ text: "新", durationTenths: 20 });
+  expect(result.current.editor).toBeNull();
+});
+
+test("入力欄を取り消すと、一覧は変わらず入力欄が閉じる", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+
+  act(() => {
+    result.current.closeEditor();
+  });
+
+  expect(result.current.editor).toBeNull();
+  expect(ids(result)).toEqual(["a"]);
+});
+
+test("テキストの場面の削除では deleteVideo を呼ばず、一覧から外れる", async () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+
+  let message: string | null = "unset";
+  await act(async () => {
+    message = await result.current.removeItem("text-1");
+  });
+
+  expect(deleteVideo).not.toHaveBeenCalled();
+  expect(message).toBeNull();
+  expect(ids(result)).toEqual(["a"]);
+  expect(result.current.deleteError).toBeNull();
+});
+
+test("テキストの場面の並べ替えが items の順に反映される", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+
+  act(() => {
+    result.current.move(1, "top");
+  });
+  expect(ids(result)).toEqual(["text-1", "a", "b"]);
+
+  act(() => {
+    result.current.move(0, "bottom");
+  });
+  expect(ids(result)).toEqual(["a", "b", "text-1"]);
+});
+
+test("totalSeconds は動画1.5秒 + テキストの場面55(5.5秒)で7.0。videoCount はテキストの場面を数えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1.5));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 55);
+  });
+
+  expect(result.current.totalSeconds).toBe(7);
+  expect(result.current.videoCount).toBe(1);
+  expect(result.current.items).toHaveLength(2);
+});
+
+test("動画の削除が失敗したとき、テキストの場面が間にあっても元の位置に戻る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+    result.current.addItem(video("c", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("一", 30);
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+  act(() => {
+    result.current.confirmText("二", 30);
+  });
+  expect(ids(result)).toEqual(["a", "text-1", "b", "text-2", "c"]);
+
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("b");
+  });
+  expect(ids(result)).toEqual(["a", "text-1", "text-2", "c"]);
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["a", "text-1", "b", "text-2", "c"]);
+});
+
+test("入力欄が開いている間は、move と removeItem を呼んでも並びが変わらず、deleteVideo も呼ばれない", async () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+
+  act(() => {
+    result.current.move(1, "up");
+  });
+  await act(async () => {
+    await result.current.removeItem("a");
+  });
+
+  expect(ids(result)).toEqual(["a", "b"]);
+  expect(deleteVideo).not.toHaveBeenCalled();
+
+  act(() => {
+    result.current.closeEditor();
+  });
+  act(() => {
+    result.current.move(1, "up");
+  });
+  expect(ids(result)).toEqual(["b", "a"]);
+});
+
+test("編集の入力欄が開いている間も、move と、テキストの場面の removeItem は何もしない", async () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+
+  act(() => {
+    result.current.move(1, "top");
+  });
+  await act(async () => {
+    await result.current.removeItem("text-1");
+  });
+
+  expect(ids(result)).toEqual(["a", "text-1"]);
+});
+
+test("Bの後に挿入する入力欄を開いている間に、先に始めていたAの削除が失敗してAが戻っても、確定するとBの直後に入る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+    result.current.addItem(video("b", 10));
+    result.current.addItem(video("c", 10));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+  expect(ids(result)).toEqual(["a", "b", "c"]);
+
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a", "b", "text-1", "c"]);
+});
+
+test("挿入の直前の項目が一覧にないとき、確定しても入らず、入力欄を閉じずに理由を返す", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+  act(() => {
+    result.current.openInsert("gone");
+  });
+
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a"]);
+  expect(result.current.editor).toEqual({ mode: "insert", afterId: "gone" });
+  expect(result.current.editorError).toBe("挿入する位置の項目がなくなりました。取り消して、もう一度挿入してください");
+});
+
+test("位置のエラーは、入力欄を取り消すと消え、失敗した id は次に付ける id を消費しない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 10));
+  });
+  act(() => {
+    result.current.openInsert("gone");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  expect(result.current.editorError).not.toBeNull();
+
+  act(() => {
+    result.current.closeEditor();
+  });
+  expect(result.current.editorError).toBeNull();
+
+  act(() => {
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  expect(ids(result)).toEqual(["a", "text-1"]);
+});
+
+test("アップロードが届いた直後(画面に反映される前)に確定しても、届いた動画は一覧から消えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+
+  act(() => {
+    result.current.addItem(video("c", 1));
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a", "b", "text-1", "c"]);
+});
+
+test("アップロードが届いた直後(画面に反映される前)に編集を確定しても、届いた動画は一覧から消えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+
+  act(() => {
+    result.current.addItem(video("b", 1));
+    result.current.confirmText("直した見出し", 50);
+  });
+
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+  expect(textOf(result.current.items[1])).toEqual({ text: "直した見出し", durationTenths: 50 });
+});
+
+test("削除の失敗で動画が戻った直後(画面に反映される前)に確定しても、戻った動画は一覧から消えない", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.openInsert("b");
+  });
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+    result.current.confirmText("見出し", 30);
+  });
+
+  expect(ids(result)).toEqual(["a", "b", "text-1"]);
+});
+
+test("削除の完了を待つ間に先頭へ見出しを挿入し、削除が失敗しても、見出しは先頭のまま", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("オープニング", 30);
+  });
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["text-1", "a", "b", "c"]);
+});
+
+test("削除の完了を待つ間に並べ替えても、削除が失敗した動画は元の直後の項目の前に戻る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.move(1, "top");
+  });
+  expect(ids(result)).toEqual(["c", "b"]);
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});
+
+test("moveById で、動かす項目を離した位置の項目の場所へ並べ替える", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+
+  act(() => {
+    result.current.moveById("c", "a");
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});
+
+test("挿入・編集の入力欄が開いている間は、moveById で並びが変わらない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.openInsert("a");
+  });
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  expect(ids(result)).toEqual(["a", "b"]);
+
+  act(() => {
+    result.current.confirmText("見出し", 30);
+  });
+  act(() => {
+    result.current.openEdit("text-1");
+  });
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  expect(ids(result)).toEqual(["a", "text-1", "b"]);
+});
+
+test("削除の完了を待つ間、動かす側・離した側のどちらかが削除中の項目なら、moveById で並びが変わらない", () => {
+  pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  act(() => {
+    void result.current.removeItem("b");
+  });
+
+  act(() => {
+    result.current.moveById("b", "a");
+  });
+  act(() => {
+    result.current.moveById("c", "b");
+  });
+
+  expect(ids(result)).toEqual(["a", "c"]);
+});
+
+test("削除の完了を待つ間に moveById で並べ替え、削除が失敗すると、削除した項目は元の直後の項目の前に戻る", async () => {
+  const control = pendingDelete();
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+    result.current.addItem(video("c", 1));
+  });
+  let pending: Promise<string | null> = Promise.resolve(null);
+  act(() => {
+    pending = result.current.removeItem("a");
+  });
+  act(() => {
+    result.current.moveById("c", "b");
+  });
+  expect(ids(result)).toEqual(["c", "b"]);
+
+  await act(async () => {
+    control.reject(new ApiError(500, "internal", "削除できませんでした"));
+    await pending;
+  });
+
+  expect(ids(result)).toEqual(["c", "a", "b"]);
+});
+
+test("画面に反映される前に追加された動画を、moveById が上書きしない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("a", 1));
+    result.current.addItem(video("b", 1));
+  });
+
+  act(() => {
+    result.current.addItem(video("c", 1));
+    result.current.moveById("b", "a");
+  });
+
+  expect(ids(result)).toEqual(["b", "a", "c"]);
+});
+
+function addShotVideos(result: { current: ReturnType<typeof useMergeQueue> }) {
+  act(() => {
+    result.current.addItem(video("20250805_120000", 1));
+    result.current.addItem(video("20250804_090000", 1));
+    result.current.addItem(video("20250804_180000", 1));
+  });
+}
+
+test("撮影日時の順に並べると、ファイル名の撮影日時の古い順になる", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+
+  act(() => {
+    result.current.sortByShootingTime();
+  });
+
+  expect(ids(result)).toEqual(["20250804_090000", "20250804_180000", "20250805_120000"]);
+});
+
+test("撮影日ごとに見出しを入れると、日付の見出しが text-N の続き番号で入り、2回目は増えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("手で入れた見出し", 30);
+  });
+  act(() => {
+    result.current.sortByShootingTime();
+  });
+
+  act(() => {
+    result.current.insertDateHeadings();
+  });
+  act(() => {
+    result.current.insertDateHeadings();
+  });
+
+  // 手で入れた見出し(text-1)は後ろの動画(8/5)と一緒に動き、日付の見出しはその前に入る
+  expect(ids(result)).toEqual([
+    "text-2", "20250804_090000", "20250804_180000", "text-3", "text-1", "20250805_120000",
+  ]);
+  expect(textOf(result.current.items[0])).toEqual({ text: "2025年8月4日", durationTenths: 10 });
+  expect(textOf(result.current.items[3])).toEqual({ text: "2025年8月5日", durationTenths: 10 });
+  expect(result.current.totalSeconds).toBe(3 + 3 + 1 + 1);
+});
+
+test("入力欄が開いている間は、撮影日時の順に並べる・見出しを入れるの操作で並びが変わらない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+  act(() => {
+    result.current.openInsert(null);
+  });
+
+  act(() => {
+    result.current.sortByShootingTime();
+    result.current.insertDateHeadings();
+  });
+
+  expect(ids(result)).toEqual(["20250805_120000", "20250804_090000", "20250804_180000"]);
+});
+
+test("画面に反映される前に追加された動画を、並べ替え・見出しの操作が上書きしない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("20250805_120000", 1));
+  });
+
+  act(() => {
+    result.current.addItem(video("20250804_090000", 1));
+    result.current.sortByShootingTime();
+    result.current.insertDateHeadings();
+  });
+
+  expect(ids(result)).toEqual(["text-1", "20250804_090000", "text-2", "20250805_120000"]);
 });
