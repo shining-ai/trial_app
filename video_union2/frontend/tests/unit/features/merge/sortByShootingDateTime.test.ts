@@ -123,6 +123,30 @@ describe("sortByShootingDateTime", () => {
     expect(ids(sortByShootingDateTime(items))).toEqual(["H4", "v07", "v09", "v18", "H5", "v12"]);
   });
 
+  test("その日の動画を全部消して残った日付の見出しは、並べても次の日の見出しと入れ替わらない", () => {
+    const items = [text("H4", "2025年8月4日"), text("H5", "2025年8月5日"), video("v12", "20250805_120000.mp4")];
+
+    expect(ids(sortByShootingDateTime(items))).toEqual(["H4", "H5", "v12"]);
+  });
+
+  test("同じ日付の見出しが2つ以上あれば、並べるときも並べたあとの順で最初の1つにまとめる", () => {
+    const items = [
+      text("A", "2025年8月4日"),
+      video("v09", "20250804_090000.mp4"),
+      text("B", "2025年8月4日"),
+      video("v07", "20250804_070000.mp4"),
+    ];
+
+    // 並べたあとの順で最初の見出し(7時の動画に付いていた B)を残す
+    expect(ids(sortByShootingDateTime(items))).toEqual(["B", "v07", "v09"]);
+  });
+
+  test("最後の動画より後ろにある日付の見出しも、その日の最初の動画の前へ置き直す", () => {
+    const items = [video("v07", "20250804_070000.mp4"), text("H4", "2025年8月4日")];
+
+    expect(ids(sortByShootingDateTime(items))).toEqual(["H4", "v07"]);
+  });
+
   test("見出しのない日には、並べるだけでは見出しを作らない", () => {
     const items = [video("v12", "20250805_120000.mp4"), video("v07", "20250804_070000.mp4")];
 

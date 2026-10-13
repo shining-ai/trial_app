@@ -113,12 +113,12 @@ describe("insertDateHeadings", () => {
     expect(insertDateHeadings(items, counter())).toEqual(items);
   });
 
-  test("別の日付の見出しが直前にあるだけなら、日付の見出しを入れる", () => {
+  test("別の日付の見出しが直前にあるだけなら、日付の見出しを入れる(別の日付の見出しはまたがず、動画の直前に入れる)", () => {
     const items = [text("D", "2025年8月4日"), video("V", "20250805_090000.mp4")];
 
     expect(insertDateHeadings(items, counter())).toEqual([
-      text("h-1", "2025年8月5日", 10),
       text("D", "2025年8月4日"),
+      text("h-1", "2025年8月5日", 10),
       video("V", "20250805_090000.mp4"),
     ]);
   });
@@ -197,12 +197,20 @@ describe("insertDateHeadings", () => {
     ]);
   });
 
+  test("その日の動画を全部消して残った日付の見出しは、その場に残り、次の日の見出しと入れ替わらない", () => {
+    // [8/4見出し, 8/4の動画, 8/5見出し, 8/5の動画] から 8/4 の動画を消した状態
+    const items = [text("H4", "2025年8月4日", 10), text("H5", "2025年8月5日", 10), video("v12", "20250805_120000.mp4")];
+
+    expect(insertDateHeadings(items, counter())).toEqual(items);
+  });
+
   test("動画のない日付の見出し(手で入れたものなど)は、ふつうのテキストの場面として残す", () => {
     const items = [text("X", "2025年1月1日"), video("v07", "20250804_070000.mp4")];
 
+    // 日付の形の見出しはまたがないので、新しい見出しはその後ろ(動画の直前)に入る
     expect(insertDateHeadings(items, counter())).toEqual([
-      text("h-1", "2025年8月4日", 10),
       text("X", "2025年1月1日"),
+      text("h-1", "2025年8月4日", 10),
       video("v07", "20250804_070000.mp4"),
     ]);
   });

@@ -45,13 +45,13 @@ export function useMergeQueue() {
     setItems((latest) => moveItemById(latest, activeId, overId));
   }, []);
 
-  /** ファイル名の撮影日時の古い順に並べる(見出しは後ろの動画と一緒に動く) */
+  /** ファイル名の撮影日時の古い順に並べる(見出しは後ろの動画と一緒に動き、日付の見出しはその日の最初の動画の前へ置き直す) */
   const sortByShootingTime = useCallback(() => {
     if (editorRef.current) return;
     setItems((latest) => sortByShootingDateTime(latest));
   }, []);
 
-  /** 撮影日が変わるたびに日付の見出しを入れる(同じ見出しがすでにあれば入れない) */
+  /** 撮影日が変わるたびに日付の見出しを入れる(既にある日付の見出しは作り直さずに移し、同じ日付は1つにまとめる) */
   const insertDateHeadings = useCallback(() => {
     if (editorRef.current) return;
     setItems((latest) =>
