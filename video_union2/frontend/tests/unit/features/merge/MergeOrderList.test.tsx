@@ -25,6 +25,8 @@ function renderList(overrides: Partial<Parameters<typeof MergeOrderList>[0]> = {
     onConfirmText: vi.fn(),
     onCloseEditor: vi.fn(),
     onMoveById: vi.fn(),
+    onSortByShootingTime: vi.fn(),
+    onInsertDateHeadings: vi.fn(),
     ...overrides,
   };
   const { rerender } = render(<MergeOrderList {...props} />);
@@ -98,7 +100,7 @@ test("結合中は並べ替え・削除・挿入のボタンがすべて押せ�
   renderList({ disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(19); // 3行 x (移動4 + 削除 + 挿入) + 先頭への挿入
+  expect(buttons).toHaveLength(21); // 3行 x (移動4 + 削除 + 挿入) + 先頭への挿入 + 撮影日時の順に並べる + 見出しを入れる
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
 
@@ -288,7 +290,7 @@ test("結合中は、テキストの場面を含む一覧の挿入・編集・�
   renderList({ items: WITH_SCENE, disabled: true });
 
   const buttons = screen.getAllByRole("button") as HTMLButtonElement[];
-  expect(buttons).toHaveLength(20); // 先頭への挿入1 + 動画2行 x 6 + テキストの場面の行 7
+  expect(buttons).toHaveLength(22); // 先頭への挿入1 + 動画2行 x 6 + テキストの場面の行 7 + 撮影日時の順に並べる + 見出しを入れる
   expect(buttons.every((button) => button.disabled)).toBe(true);
 });
 
@@ -451,4 +453,28 @@ test("行の中のボタンでスペースキーを押してもつかまない(�
   announcements.stop();
 
   expect(announcements.texts).toEqual([]);
+});
+
+
+test("「撮影日時の順に並べる」「撮影日ごとに見出しを入れる」を押すと、それぞれ通知する", () => {
+  const props = renderList();
+
+  fireEvent.click(screen.getByRole("button", { name: "撮影日時の順に並べる" }));
+  fireEvent.click(screen.getByRole("button", { name: "撮影日ごとに見出しを入れる" }));
+
+  expect(props.onSortByShootingTime).toHaveBeenCalledTimes(1);
+  expect(props.onInsertDateHeadings).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["結合中", { disabled: true }],
+  ["入力欄が開いている間", { editor: { mode: "insert" as const, afterId: null } }],
+  ["動画がないとき", { items: [] as MergeItem[] }],
+  ["テキストの場面だけのとき", { items: [SCENE] as MergeItem[] }],
+])("%sは、撮影日時の順に並べる・見出しを入れるのボタンを押せない", (_, state) => {
+  renderList(state);
+
+  for (const name of ["撮影日時の順に並べる", "撮影日ごとに見出しを入れる"]) {
+    expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+  }
 });

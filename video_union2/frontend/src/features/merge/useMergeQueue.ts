@@ -2,7 +2,9 @@ import { useCallback, useRef, useState } from "react";
 import { ApiError } from "../../lib/apiClient";
 import { countVideoItems } from "./countVideoItems";
 import { deleteVideo } from "./deleteVideo";
+import { insertDateHeadings as insertDateHeadingsInto } from "./insertDateHeadings";
 import { insertItemAfter } from "./insertItemAfter";
+import { sortByShootingDateTime } from "./sortByShootingDateTime";
 import { moveItem, type MoveDirection } from "./moveItem";
 import { moveItemById } from "./moveItemById";
 import { replaceItem } from "./replaceItem";
@@ -41,6 +43,23 @@ export function useMergeQueue() {
   const moveById = useCallback((activeId: string, overId: string) => {
     if (editorRef.current) return;
     setItems((latest) => moveItemById(latest, activeId, overId));
+  }, []);
+
+  /** ファイル名の撮影日時の古い順に並べる(見出しは後ろの動画と一緒に動く) */
+  const sortByShootingTime = useCallback(() => {
+    if (editorRef.current) return;
+    setItems((latest) => sortByShootingDateTime(latest));
+  }, []);
+
+  /** 撮影日が変わるたびに日付の見出しを入れる(同じ見出しがすでにあれば入れない) */
+  const insertDateHeadings = useCallback(() => {
+    if (editorRef.current) return;
+    setItems((latest) =>
+      insertDateHeadingsInto(latest, () => {
+        textSceneCount.current += 1;
+        return `text-${textSceneCount.current}`;
+      }),
+    );
   }, []);
 
   const openInsert = useCallback((afterId: string | null) => {
@@ -128,6 +147,8 @@ export function useMergeQueue() {
     addItem,
     move,
     moveById,
+    sortByShootingTime,
+    insertDateHeadings,
     removeItem,
     openInsert,
     openEdit,

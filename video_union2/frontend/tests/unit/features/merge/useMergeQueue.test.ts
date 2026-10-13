@@ -778,3 +778,81 @@ test("画面に反映される前に追加された動画を、moveById が上�
 
   expect(ids(result)).toEqual(["b", "a", "c"]);
 });
+
+function addShotVideos(result: { current: ReturnType<typeof useMergeQueue> }) {
+  act(() => {
+    result.current.addItem(video("20250805_120000", 1));
+    result.current.addItem(video("20250804_090000", 1));
+    result.current.addItem(video("20250804_180000", 1));
+  });
+}
+
+test("撮影日時の順に並べると、ファイル名の撮影日時の古い順になる", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+
+  act(() => {
+    result.current.sortByShootingTime();
+  });
+
+  expect(ids(result)).toEqual(["20250804_090000", "20250804_180000", "20250805_120000"]);
+});
+
+test("撮影日ごとに見出しを入れると、日付の見出しが text-N の続き番号で入り、2回目は増えない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+  act(() => {
+    result.current.openInsert(null);
+  });
+  act(() => {
+    result.current.confirmText("手で入れた見出し", 30);
+  });
+  act(() => {
+    result.current.sortByShootingTime();
+  });
+
+  act(() => {
+    result.current.insertDateHeadings();
+  });
+  act(() => {
+    result.current.insertDateHeadings();
+  });
+
+  // 手で入れた見出し(text-1)は後ろの動画(8/5)と一緒に動き、日付の見出しはその前に入る
+  expect(ids(result)).toEqual([
+    "text-2", "20250804_090000", "20250804_180000", "text-3", "text-1", "20250805_120000",
+  ]);
+  expect(textOf(result.current.items[0])).toEqual({ text: "2025年8月4日", durationTenths: 10 });
+  expect(textOf(result.current.items[3])).toEqual({ text: "2025年8月5日", durationTenths: 10 });
+  expect(result.current.totalSeconds).toBe(3 + 3 + 1 + 1);
+});
+
+test("入力欄が開いている間は、撮影日時の順に並べる・見出しを入れるの操作で並びが変わらない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  addShotVideos(result);
+  act(() => {
+    result.current.openInsert(null);
+  });
+
+  act(() => {
+    result.current.sortByShootingTime();
+    result.current.insertDateHeadings();
+  });
+
+  expect(ids(result)).toEqual(["20250805_120000", "20250804_090000", "20250804_180000"]);
+});
+
+test("画面に反映される前に追加された動画を、並べ替え・見出しの操作が上書きしない", () => {
+  const { result } = renderHook(() => useMergeQueue());
+  act(() => {
+    result.current.addItem(video("20250805_120000", 1));
+  });
+
+  act(() => {
+    result.current.addItem(video("20250804_090000", 1));
+    result.current.sortByShootingTime();
+    result.current.insertDateHeadings();
+  });
+
+  expect(ids(result)).toEqual(["text-1", "20250804_090000", "text-2", "20250805_120000"]);
+});

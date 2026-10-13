@@ -23,5 +23,9 @@ export default function globalSetup() {
   makeVideo("long-b.mp4", "blue", 16, 16, 901, 1);
   // テキストの場面を足すと30分を超える組み合わせの確認用(901秒 + 899秒 = 30:00 ちょうど。テキストの場面1.0秒で 30:01)
   makeVideo("long-899.mp4", "blue", 16, 16, 899, 1);
+  // 撮影日時の順に並べる・撮影日ごとの見出しの確認用(ファイル名が撮影日時)
+  makeVideo("20250805_120000.mp4", "blue", 320, 180, 1);
+  makeVideo("20250804_090000.mp4", "red", 320, 180, 1);
+  makeVideo("20250804_180000.mp4", "green", 320, 180, 1);
   writeFileSync(videoPath("not_a_video.mp4"), "これは動画ではなく、拡張子だけが .mp4 のテキストファイルです。\n");
 }

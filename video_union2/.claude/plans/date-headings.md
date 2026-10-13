@@ -29,7 +29,7 @@
 - **`parseShootingDateTime.ts`**: `(fileName) => { date: "20250804"; key: "20250804184201" } | null`
 - **`formatDateHeading.ts`**: `("20250804") => "2025年8月4日"`
 - **`sortByShootingDateTime.ts`**: `(items) => MergeItem[]`。テキストの場面を後ろの動画とまとめた「かたまり」を作り、動画の撮影日時のキーで安定に並べる(読めないものは後ろ)。末尾の見出しは最後に残す
-- **`insertDateHeadings.ts`**: `(items, nextId: () => string) => MergeItem[]`。前から見て、撮影日が前の動画と変わったら(最初の動画も含む)、その動画の直前に見出しを入れる。直前の項目が同じ文のテキストの場面なら入れない。読めない動画は見出しを付けず、日付の判定にも使わない
+- **`insertDateHeadings.ts`**: `(items, nextId: () => string) => MergeItem[]`。前から見て、撮影日が前の動画と変わったら(最初の動画も含む)、その動画の直前に続いているテキストの場面のかたまりの前に見出しを入れる(日付が大見出し、手で入れた見出しが小見出しになる)。そのかたまりに同じ文のテキストの場面があれば入れない。読めない動画は見出しを付けず、日付の判定にも使わない
 
 ### 状態(`useMergeQueue.ts`)
 - `sortByShootingTime()`、`insertDateHeadings()` を足す。入力欄が開いている間は何もしない。関数で更新する。見出しの id は既存のテキストの場面と同じ `text-N` の数え方

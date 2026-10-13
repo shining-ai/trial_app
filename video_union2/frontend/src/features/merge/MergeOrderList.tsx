@@ -37,10 +37,16 @@ export function MergeOrderList(props: {
   onCloseEditor: () => void;
   /** ドラッグで、activeId の項目を overId の項目の位置へ動かす */
   onMoveById: (activeId: string, overId: string) => void;
+  /** ファイル名の撮影日時の順に並べる */
+  onSortByShootingTime: () => void;
+  /** 撮影日ごとに日付の見出しを入れる */
+  onInsertDateHeadings: () => void;
 }) {
   const { items, editor, editorError, disabled, deleteError, onMove, onRemove } = props;
   const { onOpenInsert, onOpenEdit, onConfirmText, onCloseEditor, onMoveById } = props;
+  const { onSortByShootingTime, onInsertDateHeadings } = props;
   const lastIndex = items.length - 1;
+  const hasVideo = items.some((item) => item.kind === "video");
   // 結合中と、入力欄が開いている間は、入力欄以外の操作をすべて止める(入力中に並びが変わらないようにする)
   const locked = disabled || editor !== null;
   // 挿入の直前の項目がなくなったときも、取り消せるよう入力欄を一覧の下に出す
@@ -157,6 +163,12 @@ export function MergeOrderList(props: {
       <div className="merge-list__head">
         <button type="button" className="btn btn--add" disabled={locked} onClick={() => onOpenInsert(null)}>
           先頭にテキストを挿入
+        </button>
+        <button type="button" className="btn" disabled={locked || !hasVideo} onClick={onSortByShootingTime}>
+          撮影日時の順に並べる
+        </button>
+        <button type="button" className="btn" disabled={locked || !hasVideo} onClick={onInsertDateHeadings}>
+          撮影日ごとに見出しを入れる
         </button>
       </div>
       {editor?.mode === "insert" && editor.afterId === null

@@ -55,6 +55,8 @@ export function App() {
           onConfirmText={mergeQueue.confirmText}
           onCloseEditor={mergeQueue.closeEditor}
           onMoveById={mergeQueue.moveById}
+          onSortByShootingTime={mergeQueue.sortByShootingTime}
+          onInsertDateHeadings={mergeQueue.insertDateHeadings}
         />
         <div className="merge-footer">
           <MergeSummary totalSeconds={mergeQueue.totalSeconds} excessSeconds={check.excessSeconds} />

@@ -418,6 +418,8 @@ body {
 
 .merge-list__head {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ---- テキストの場面の入力欄 ---- */
