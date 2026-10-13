@@ -108,4 +108,24 @@ describe("sortByShootingDateTime", () => {
 
     expect(ids(sortByShootingDateTime(items))).toEqual(["T1", "T2"]);
   });
+
+  test("日付の見出しは、後ろの動画ではなくその日の最初の動画の前へ並べ直す(新しくは作らない)", () => {
+    // 見出しを入れたあとに、同じ日のもっと早い動画(7時)を末尾に足した状態
+    const items = [
+      text("H4", "2025年8月4日"),
+      video("v09", "20250804_090000.mp4"),
+      video("v18", "20250804_180000.mp4"),
+      text("H5", "2025年8月5日"),
+      video("v12", "20250805_120000.mp4"),
+      video("v07", "20250804_070000.mp4"),
+    ];
+
+    expect(ids(sortByShootingDateTime(items))).toEqual(["H4", "v07", "v09", "v18", "H5", "v12"]);
+  });
+
+  test("見出しのない日には、並べるだけでは見出しを作らない", () => {
+    const items = [video("v12", "20250805_120000.mp4"), video("v07", "20250804_070000.mp4")];
+
+    expect(ids(sortByShootingDateTime(items))).toEqual(["v07", "v12"]);
+  });
 });

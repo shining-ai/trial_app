@@ -160,4 +160,50 @@ describe("insertDateHeadings", () => {
   test("空の配列は空の配列を返す", () => {
     expect(insertDateHeadings([], counter())).toEqual([]);
   });
+
+  test("日の途中に取り残された日付の見出しは、作り直さずにその日の最初の動画の前へ移す(表示時間と id は保つ)", () => {
+    // 見出しを入れたあとに、同じ日のもっと早い動画(7時)を足して並べた状態
+    const items = [
+      video("v07", "20250804_070000.mp4"),
+      text("H4", "2025年8月4日", 25),
+      video("v09", "20250804_090000.mp4"),
+      video("v18", "20250804_180000.mp4"),
+      text("H5", "2025年8月5日", 10),
+      video("v12", "20250805_120000.mp4"),
+    ];
+
+    expect(insertDateHeadings(items, counter())).toEqual([
+      text("H4", "2025年8月4日", 25),
+      video("v07", "20250804_070000.mp4"),
+      video("v09", "20250804_090000.mp4"),
+      video("v18", "20250804_180000.mp4"),
+      text("H5", "2025年8月5日", 10),
+      video("v12", "20250805_120000.mp4"),
+    ]);
+  });
+
+  test("同じ日付の見出しが2つ以上あれば、最初の1つにまとめる", () => {
+    const items = [
+      text("A", "2025年8月4日", 20),
+      video("v07", "20250804_070000.mp4"),
+      text("B", "2025年8月4日", 10),
+      video("v09", "20250804_090000.mp4"),
+    ];
+
+    expect(insertDateHeadings(items, counter())).toEqual([
+      text("A", "2025年8月4日", 20),
+      video("v07", "20250804_070000.mp4"),
+      video("v09", "20250804_090000.mp4"),
+    ]);
+  });
+
+  test("動画のない日付の見出し(手で入れたものなど)は、ふつうのテキストの場面として残す", () => {
+    const items = [text("X", "2025年1月1日"), video("v07", "20250804_070000.mp4")];
+
+    expect(insertDateHeadings(items, counter())).toEqual([
+      text("h-1", "2025年8月4日", 10),
+      text("X", "2025年1月1日"),
+      video("v07", "20250804_070000.mp4"),
+    ]);
+  });
 });
