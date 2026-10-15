@@ -1,0 +1,47 @@
+services:
+  scraper:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./scraper.py:/app/scraper.py
+      - ./scraper.toml:/app/scraper.toml
+    environment:
+      - TZ=Asia/Tokyo
+
+  excel:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./to_excel.py:/app/to_excel.py
+    environment:
+      - TZ=Asia/Tokyo
+    entrypoint: ["python", "to_excel.py"]
+
+  run:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./scraper.py:/app/scraper.py
+      - ./scraper.toml:/app/scraper.toml
+      - ./to_excel.py:/app/to_excel.py
+    environment:
+      - TZ=Asia/Tokyo
+    entrypoint: ["sh", "-c", "python scraper.py \"$@\" && python to_excel.py", "sh"]
+
+  compare:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./compare.py:/app/compare.py
+    environment:
+      - TZ=Asia/Tokyo
+    entrypoint: ["python", "compare.py"]
+
+  analyze:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./analyze.py:/app/analyze.py
+    environment:
+      - TZ=Asia/Tokyo
+    entrypoint: ["python", "analyze.py"]
