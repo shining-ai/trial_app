@@ -438,7 +438,12 @@ test("HTML の特殊文字を含む名前も、読み上げにそのまま文字
   await vi.waitFor(() => expect(announcements.texts).toContain(`並べ替えを取り消しました。${name} は 1 番目のままです。`));
   announcements.stop();
 
-  expect(document.querySelector("img")).toBeNull();
+  // 画像はサムネイルの2枚だけで、名前から img 要素は作られない
+  const images = [...document.querySelectorAll("img")];
+  expect(images.map((image) => image.getAttribute("src"))).toEqual([
+    "/api/videos/id-A/thumbnail",
+    "/api/videos/id-B/thumbnail",
+  ]);
 });
 
 
@@ -477,4 +482,14 @@ test.each([
   for (const name of ["撮影日時の順に並べる", "撮影日ごとに見出しを入れる"]) {
     expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
   }
+});
+
+test("動画の行にはその動画のサムネイルを出し、テキストの場面の行には出さない", () => {
+  const scene: TextSceneItem = { kind: "text", id: "text-1", text: "見出し", durationTenths: 10 };
+  renderList({ items: [video("A"), scene, video("B")] });
+
+  const rows = within(screen.getByRole("list")).getAllByRole("listitem");
+  expect(within(rows[0]).getByTestId("video-thumbnail").getAttribute("src")).toBe("/api/videos/id-A/thumbnail");
+  expect(within(rows[1]).queryByTestId("video-thumbnail")).toBeNull();
+  expect(within(rows[2]).getByTestId("video-thumbnail").getAttribute("src")).toBe("/api/videos/id-B/thumbnail");
 });

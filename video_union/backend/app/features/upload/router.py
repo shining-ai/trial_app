@@ -1,8 +1,10 @@
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Request, Response
+from fastapi.responses import FileResponse
 
 from app.features.upload.delete_video import delete_video
+from app.features.upload.find_thumbnail import find_thumbnail
 from app.features.upload.schemas import VideoResponse
 from app.features.upload.upload_video import upload_video
 from app.lib.errors import AppError
@@ -26,3 +28,8 @@ async def post_video(request: Request) -> VideoResponse:
 def remove_video(video_id: str, request: Request) -> Response:
     delete_video(video_id, request.app.state.storage)
     return Response(status_code=204)
+
+
+@router.get("/api/videos/{video_id}/thumbnail")
+def get_thumbnail(video_id: str, request: Request) -> FileResponse:
+    return FileResponse(find_thumbnail(video_id, request.app.state.storage), media_type="image/jpeg")

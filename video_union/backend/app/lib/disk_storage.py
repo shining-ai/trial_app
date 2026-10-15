@@ -33,6 +33,9 @@ class DiskStorage:
     def upload_metadata_temp_path(self, video_id: str) -> Path:
         return self._inside(self.uploads_dir() / f"{self._checked(video_id)}.json.tmp")
 
+    def upload_thumbnail_path(self, video_id: str) -> Path:
+        return self._inside(self.uploads_dir() / f"{self._checked(video_id)}.jpg")
+
     def upload_temp_path(self, video_id: str) -> Path:
         return self._inside(self.uploads_dir() / f"{self._checked(video_id)}.part")
 

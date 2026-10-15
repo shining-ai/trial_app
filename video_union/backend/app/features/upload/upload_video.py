@@ -2,6 +2,7 @@ import time
 from collections.abc import AsyncIterator
 
 from app.features.upload.check_upload_size import check_upload_size
+from app.features.upload.make_thumbnail import make_thumbnail
 from app.features.upload.parse_probe_output import parse_probe_output
 from app.features.upload.probe_video import probe_video
 from app.features.upload.receive_upload import receive_upload
@@ -22,13 +23,14 @@ _NAME = "upload.upload_video"
 async def upload_video(
     chunks: AsyncIterator[bytes], file_name: str, declared_size: int | None, settings: Settings, storage: DiskStorage
 ) -> VideoResponse:
-    """受信 → ffprobe → 判定 → 本保存 → メタ情報の書き込みを行う。失敗したら作ったファイルを消す。"""
+    """受信 → ffprobe → 判定 → 本保存 → サムネイル作成 → メタ情報の書き込みを行う。失敗したら作ったファイルを消す。"""
     started = time.monotonic()
     video_id = generate_id()
     temp = storage.upload_temp_path(video_id)
     video = storage.upload_video_path(video_id)
     metadata = storage.upload_metadata_path(video_id)
     metadata_temp = storage.upload_metadata_temp_path(video_id)
+    thumbnail = storage.upload_thumbnail_path(video_id)
     try:
         failure = check_upload_size(
             declared_size, max_bytes=settings.max_upload_bytes, free_bytes=free_bytes(storage.uploads_dir())
@@ -44,11 +46,23 @@ async def upload_video(
         if failure is not None:
             raise AppError(422, failure.code, failure.message)
         temp.replace(video)
+        try:
+            await make_thumbnail(video, thumbnail, video_stream_index=info.video_stream_index,
+                                 timeout_seconds=settings.thumbnail_timeout_seconds)
+        except ProcessFailedError as e:
+            if e.timed_out:
+                # 混み合って間に合わなかっただけで、動画が壊れているとは限らない
+                raise AppError(
+                    503, "thumbnail_timeout",
+                    "動画の読み込みに時間がかかりすぎました。しばらくしてからもう一度お試しください",
+                ) from e
+            # ffprobe は読めても先頭のコマを復号できない動画は、結合もできない
+            raise AppError(422, "not_a_video", "動画として読み込めませんでした") from e
         write_metadata(metadata, metadata_temp, video_id=video_id, file_name=file_name, size_bytes=size, info=info)
     except BaseException as e:
         log_error(_NAME, "アップロードに失敗しました", err=e, video_ids=[video_id],
                   ms=round((time.monotonic() - started) * 1000))
-        _remove_quietly_with_note(e, video_id, temp, video, metadata_temp, metadata)
+        _remove_quietly_with_note(e, video_id, temp, video, thumbnail, metadata_temp, metadata)
         raise
 
     log_info(_NAME, "アップロードが完了しました", video_ids=[video_id], size_bytes=size,

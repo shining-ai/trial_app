@@ -11,6 +11,7 @@ def test_settings_from_empty_environment_uses_defaults():
     assert (settings.max_long_side, settings.max_short_side) == (3840, 2160)
     assert settings.stale_file_hours == 24
     assert settings.ffprobe_timeout_seconds == 60
+    assert settings.thumbnail_timeout_seconds == 60
     assert settings.max_videos == 100
     assert settings.max_total_seconds == 1800
     assert settings.max_fps == 60
@@ -35,6 +36,22 @@ def test_settings_reads_values_from_environment():
     assert settings.max_upload_bytes == 1024
     assert settings.max_total_seconds == 2
     assert settings.x264_preset == "ultrafast"
+
+
+def test_settings_reads_thumbnail_timeout_from_environment():
+    settings = Settings.from_env({"THUMBNAIL_TIMEOUT_SECONDS": "5"})
+
+    assert settings.thumbnail_timeout_seconds == 5
+
+
+def test_settings_accepts_thumbnail_timeout_of_one_second():
+    assert Settings.from_env({"THUMBNAIL_TIMEOUT_SECONDS": "1"}).thumbnail_timeout_seconds == 1
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_settings_rejects_thumbnail_timeout_of_zero_or_less(value):
+    with pytest.raises(ValueError, match="THUMBNAIL_TIMEOUT_SECONDS"):
+        Settings.from_env({"THUMBNAIL_TIMEOUT_SECONDS": value})
 
 
 def test_settings_with_non_numeric_value_raises_error():
