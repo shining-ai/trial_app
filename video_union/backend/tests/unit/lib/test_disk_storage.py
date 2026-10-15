@@ -17,6 +17,7 @@ def test_upload_paths_are_inside_uploads_dir(storage, tmp_path):
     assert storage.upload_metadata_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.json"
     assert storage.upload_temp_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.part"
     assert storage.upload_metadata_temp_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.json.tmp"
+    assert storage.upload_thumbnail_path(VALID_ID) == root / "uploads" / f"{VALID_ID}.jpg"
     assert storage.uploads_dir() == root / "uploads"
 
 
@@ -66,3 +67,8 @@ def test_invalid_ids_are_rejected(storage, bad_id):
 def test_is_valid_id_accepts_only_32_lowercase_hex(storage):
     assert DiskStorage.is_valid_id(VALID_ID) is True
     assert DiskStorage.is_valid_id("../x") is False
+
+
+def test_invalid_id_is_rejected_for_thumbnail_path(storage):
+    with pytest.raises(InvalidIdError):
+        storage.upload_thumbnail_path("../etc/passwd")

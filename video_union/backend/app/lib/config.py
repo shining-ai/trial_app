@@ -12,6 +12,7 @@ class Settings:
     max_short_side: int = 2160
     stale_file_hours: int = 24
     ffprobe_timeout_seconds: int = 60
+    thumbnail_timeout_seconds: int = 60
     max_videos: int = 100
     max_total_seconds: int = 1800
     max_fps: int = 60
@@ -32,6 +33,9 @@ class Settings:
             max_short_side=_int(env, "MAX_SHORT_SIDE", defaults.max_short_side),
             stale_file_hours=_int(env, "STALE_FILE_HOURS", defaults.stale_file_hours),
             ffprobe_timeout_seconds=_int(env, "FFPROBE_TIMEOUT_SECONDS", defaults.ffprobe_timeout_seconds),
+            thumbnail_timeout_seconds=_positive_int(
+                env, "THUMBNAIL_TIMEOUT_SECONDS", defaults.thumbnail_timeout_seconds
+            ),
             max_videos=_int(env, "MAX_VIDEOS", defaults.max_videos),
             max_total_seconds=_int(env, "MAX_TOTAL_SECONDS", defaults.max_total_seconds),
             max_fps=_int(env, "MAX_FPS", defaults.max_fps),
@@ -49,3 +53,10 @@ def _int(env: Mapping[str, str], name: str, default: int) -> int:
         return int(env[name])
     except ValueError as e:
         raise ValueError(f"環境変数 {name} は整数で指定してください") from e
+
+
+def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
+    value = _int(env, name, default)
+    if value <= 0:
+        raise ValueError(f"環境変数 {name} は1以上の整数で指定してください")
+    return value

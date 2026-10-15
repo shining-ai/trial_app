@@ -24,7 +24,7 @@ def _stored_files(settings):
     return sorted(p.name for p in uploads.iterdir()) if uploads.exists() else []
 
 
-def test_upload_video_returns_201_with_display_info_and_stores_bin_and_metadata(client, settings, tmp_path):
+def test_upload_video_returns_201_with_display_info_and_stores_bin_thumbnail_and_metadata(client, settings, tmp_path):
     video = make_video(tmp_path / "IMG_0001.mp4", width=640, height=360, duration=2.0)
 
     response = _upload(client, video)
@@ -34,7 +34,7 @@ def test_upload_video_returns_201_with_display_info_and_stores_bin_and_metadata(
     assert body["file_name"] == "IMG_0001.mp4"
     assert abs(body["duration_seconds"] - 2.0) <= 0.05
     assert (body["width"], body["height"]) == (640, 360)
-    assert _stored_files(settings) == [f"{body['id']}.bin", f"{body['id']}.json"]
+    assert _stored_files(settings) == [f"{body['id']}.bin", f"{body['id']}.jpg", f"{body['id']}.json"]
     metadata = json.loads((settings.storage_dir / "uploads" / f"{body['id']}.json").read_text())
     assert metadata == {
         "version": 1,
@@ -222,11 +222,11 @@ def test_file_name_with_path_traversal_is_only_stored_in_metadata(client, settin
     assert response.status_code == 201
     assert response.json()["file_name"] == "../../etc/passwd"
     video_id = response.json()["id"]
-    assert _stored_files(settings) == [f"{video_id}.bin", f"{video_id}.json"]
+    assert _stored_files(settings) == [f"{video_id}.bin", f"{video_id}.jpg", f"{video_id}.json"]
     assert not (settings.storage_dir.parent / "etc").exists()
 
 
-def test_delete_removes_video_and_metadata(client, settings, tmp_path):
+def test_delete_removes_video_metadata_and_thumbnail(client, settings, tmp_path):
     video_id = _upload(client, make_video(tmp_path / "a.mp4")).json()["id"]
 
     response = client.delete(f"/api/videos/{video_id}")

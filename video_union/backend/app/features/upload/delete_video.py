@@ -8,16 +8,19 @@ from app.lib.logger import log_error
 
 
 def delete_video(video_id: str, storage: DiskStorage) -> None:
-    """アップロード済みの動画ファイルとメタ情報を消す。"""
+    """アップロード済みの動画ファイル・サムネイル・メタ情報を消す。"""
     try:
         video = storage.upload_video_path(video_id)
         metadata = storage.upload_metadata_path(video_id)
+        thumbnail = storage.upload_thumbnail_path(video_id)
     except InvalidIdError as e:
         raise _not_found() from e
     if not video.exists() and not metadata.exists():
         raise _not_found()
     started = time.monotonic()
     try:
+        # サムネイルを先に消す(途中で失敗しても、動画とメタ情報が残っていれば削除をやり直せる)
+        thumbnail.unlink(missing_ok=True)
         video.unlink(missing_ok=True)
         delete_metadata(metadata)
     except OSError as e:

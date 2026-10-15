@@ -7,6 +7,7 @@ import { SortableMergeList } from "./SortableMergeList";
 import { summarizeSceneText } from "./summarizeSceneText";
 import { TextSceneEditor } from "./TextSceneEditor";
 import type { MergeItem, TextSceneItem } from "./types";
+import { VideoThumbnail } from "./VideoThumbnail";
 import type { TextEditor } from "./useMergeQueue";
 
 const MOVE_BUTTONS: { direction: MoveDirection; label: string }[] = [
@@ -137,6 +138,7 @@ export function MergeOrderList(props: {
   function renderVideo(item: MergeItem & { kind: "video" }, index: number): ReactNode {
     return (
       <div className="merge-item__row">
+        <VideoThumbnail videoId={item.id} />
         <div className="merge-item__main">
           <span className="merge-item__name">{item.file_name}</span>{" "}
           <span className="merge-item__meta">{`${formatDuration(item.duration_seconds)} / ${item.width}x${item.height}`}</span>
