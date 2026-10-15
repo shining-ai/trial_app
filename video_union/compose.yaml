@@ -12,9 +12,12 @@ services:
       - media:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
-      interval: 2s
+      # 起動中(start_period)は1秒ごとに確かめて早く healthy にし、起動後は5分ごとに減らす
+      interval: 5m
       timeout: 3s
-      retries: 30
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
 
   frontend:
     build: ./frontend
@@ -28,9 +31,12 @@ services:
       - /app/node_modules
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 2s
+      # 起動中(start_period)は1秒ごとに確かめて早く healthy にし、起動後は5分ごとに減らす
+      interval: 5m
       timeout: 3s
-      retries: 30
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
 
   # E2Eテスト専用。`docker compose run` で呼んだときだけ動き、backend と frontend の起動を待ってから実行する
   e2e:
